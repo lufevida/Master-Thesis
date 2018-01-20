@@ -1,0 +1,112 @@
+%&latex
+% UF Sample ETD Main Document Fall 2014
+
+%\documentclass[12pt,final,CPage]{ufthesis} % Use this line for Windows OS
+\documentclass[12pt,dvipdfmx,final,CPage]{ufthesis} % Use this line for Macintosh/Linux
+
+% Macintosh and Linux users - If you get a dvipdfm file not found error change dvipdfm to dvipdfmx here and in the packages.tex file graphicx and hyperref packages
+
+\include{tex/packages}
+%\def\UrlFont{\rmfamily} % use this line for Times New Roman
+\def\UrlFont{\sffamily} % use this line for CMSS
+
+% This command allows equation arrays and similar environments to break across pages to improve text flow - use only if needed.
+%\allowdisplaybreaks
+
+% Prevent figures, tables or algorithms from using a separate page or column alone
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
+
+% correct bad hyphenation here
+%\hyphenation{op-tical net-works semi-C:\Program Files\MiKTeX 2.5\miktexconduc-tor}
+
+% Extra commands or misc formatting such as page alignment or output paper-size commands
+%\include{extraparameters}
+
+% Set your personal and paper information
+\SetFullName{Luis F. Vieira Damiani}
+\SetThesisType{Thesis}
+\SetDegreeType{Master of Science}
+\SetGradMonth{July}
+\SetGradYear{2018}
+\SetDepartment{Computer Science}
+\SetChair{Dr.~Beverly Sanders}
+
+% If you have a cochair there two places in the ufthesis.cls file that will need to be uncommented as well.
+% In the "getting personal information" section about line 630, and the "Abstract" Section around line 556.
+% If you have a c-chair you must uncomment that line in userinfo.tex
+%\SetCochair{John W. Carver III}
+
+% Type your title here in all CAPS %
+\SetTitle{TITLE GOES HERE}
+
+\include{tex/commands}
+
+\begin{document}
+
+\maketitle
+\makecopyright
+
+\dedication{
+	\addvspace{4.25in}
+	\begin{center}
+		\singlespacing
+		Dedication goes here.\\
+	\end{center}
+}
+
+\acknowledge{
+	Acknowledgments go here.
+}
+
+\pdfbookmark[0]{TABLE OF CONTENTS}{tableofcontents}
+\tableofcontents
+\listoftables
+%\setcounter{lofdepth}{2}
+\listoffigures
+
+% Produced list of abbreviations or symbols %
+%\printindex[keylist]{KEY TO ABBREVIATIONS}{KEY TO ABBREVIATIONS}{}
+%\printindex[mathlist]{KEY TO SYMBOLS}{KEY TO SYMBOLS}{%
+%The list shown below gives a brief description of the major mathematical
+%symbols defined in this work. For each symbol, the page number corresponds
+%to the place where the symbol is first used.} %
+
+\addtocontents{toc}{\protect\addvspace{10pt}\noindent{CHAPTER}\protect\hfill\par}{}
+\phantomsection
+
+%\include{tex/abbreviations} % optional
+
+\begin{abstract}
+	Abstract goes here.  
+\end{abstract}
+
+\include{tex/chapter1}
+%\include{tex/chapter3}
+%\include{tex/chapter2}
+%\include{tex/chapter4}
+
+\appendix
+\clearpage
+\addtocontents{toc}{\protect\addvspace{10pt}\noindent{APPENDIX}\protect\hfill\par}{}
+
+%\input{tex/appendixA}
+%\input{tex/appendixB}
+%\input{tex/appendixC}
+%\input{tex/appendixD}
+
+\bibliographystyle{bst/Science_Web}
+%\bibliographystyle{bst/apa-good}
+%\bibliographystyle{bst/Chicago_Web}
+%\bibliographystyle{bst/ecology_web}
+%\bibliographystyle{bst/IEEEtran}
+%\bibliographystyle{bst/mla-good}
+
+\bibliography{references}
+
+\biography{
+	Bio goes here.
+}
+
+\end{document}
