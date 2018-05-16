@@ -1,7 +1,3 @@
-
-% optional command to prevent a word from breaking across a line
-%\hyphenchar\font=-1
-
 % Commands to produce proper bullet list
 \newlength{\widthOfItem}
 \let\Itemize=\itemize
@@ -24,3 +20,24 @@
 \newcommand{\red}{\textcolor[rgb]{1.00,0.00,0.00}}
 \newcommand{\green}{\textcolor[rgb]{0.00,1.00,0.00}}
 \newcommand{\blue}{\textcolor[rgb]{0.00,0.00,1.00}}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{algorithm}[theorem]{Algorithm}
+\newtheorem{example}[theorem]{Example}
+
+\lstset
+{
+%	language=Matlab,
+	basicstyle=\footnotesize,
+	numbers=left,
+%	stepnumber=1,
+	showstringspaces=false,
+%	tabsize=1,
+	breaklines=true,
+	breakatwhitespace=false,
+}
