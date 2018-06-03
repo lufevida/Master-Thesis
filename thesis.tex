@@ -4,15 +4,11 @@
 
 \include{tex/packages}
 
-\def\UrlFont{\sffamily}
-
-%\allowdisplaybreaks
+\def\UrlFont{\rmfamily}
 
 \renewcommand{\topfraction}{0.85}
 \renewcommand{\textfraction}{0.1}
 \renewcommand{\floatpagefraction}{0.75}
-
-%\include{extraparameters}
 
 \SetFullName{Luis F. Vieira Damiani}
 \SetThesisType{Thesis}
@@ -22,7 +18,7 @@
 \SetDepartment{Computer Science}
 \SetChair{Dr.~Beverly Sanders}
 
-\SetTitle{TITLE GOES HERE}
+\SetTitle{A \emph{JAVA} FRAMEWORK AND DOMAIN-SPECIFIC LANGUAGE FOR MANIPULATING SOUNDS}
 
 \include{tex/commands}
 
@@ -35,7 +31,7 @@
 	\addvspace{4.25in}
 	\begin{center}
 		\singlespacing
-		Dedication goes here.\\
+		For my wife, Maria In\^es.\\
 	\end{center}
 }
 
@@ -46,7 +42,6 @@
 \pdfbookmark[0]{TABLE OF CONTENTS}{tableofcontents}
 \tableofcontents
 \listoftables
-%\setcounter{lofdepth}{2}
 \listoffigures
 
 \addtocontents{toc}{\protect\addvspace{10pt}\noindent{CHAPTER}\protect\hfill\par}{}
@@ -56,17 +51,18 @@
 	Abstract goes here.  
 \end{abstract}
 
-\include{tex/chapter1}
+%\include{tex/chapter1}
 \include{tex/chapter2}
+\include{tex/chapter3}
 
 \appendix
 \clearpage
 \addtocontents{toc}{\protect\addvspace{10pt}\noindent{APPENDIX}\protect\hfill\par}{}
 
-\input{tex/appendixA}
+%\input{tex/appendixA}
+%\input{tex/appendixB}
 
 \bibliographystyle{bst/Science_Web}
-
 \bibliography{references}
 
 \biography{
