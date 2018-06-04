@@ -31,7 +31,7 @@ The implementation of a software application to control variable-function DSP ha
 	\emph{Music 1000} is a descendant of the \emph{Music N} family of languages that was designed to drive the Digital Music Systems DMX­1000 signal processing computer, in which we can clearly observe the unit-generator concept in action. In Listing \ref{alg:music1000}, a \lstinline{fnctn} statement assigns to variable \lstinline{func1} an array of 512 samples using a \lstinline{fourier} series of exactly one harmonically-related sine, whose (trivial) sum is \lstinline{normal}-ized. The amplitude of 1000 is then meaningless, but a required argument. In fact, \lstinline{func1} takes a variable number of arguments, where for each harmonic partial, the user specifies a relative amplitude. The block that follows defines an instrument, in which the unit generator \lstinline{oscil} takes as arguments the output of three other unit generators, which are respectively the wavetable previously computed, as well as amplitude and frequency parameters, whose values are in turn captured by two knobs attached to the machine. The knobs produce values between 0 and 1, and the subsequent arguments to \lstinline{kscale} are scaling parameters. Finally, \lstinline{out} is a unit generator that connects the output of \lstinline{oscil} to the digital-to-analog converter.
 \end{example}
 
-\begin{lstlisting}[caption={\emph{Music 1000} algorithm that produces a sine wave.},label={alg:music1000}]
+\begin{lstlisting}[emph={fnctn,instr,kscale,oscil,out,endin,fourier,normal},emphstyle={\textbf},caption={\emph{Music 1000} algorithm that produces a sine wave.},label={alg:music1000}]
 fnctn func1, 512, fourier, normal, 1, 1000
 instr 1
 	kscale amp, knob1, 0, 10000

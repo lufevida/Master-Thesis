@@ -27,8 +27,19 @@
 \usepackage{booktabs}
 \usepackage[hyperfootnotes=false]{hyperref}
 \usepackage[ruled, lined, longend, linesnumbered]{algorithm2e}
-\usepackage{musixtex}
 \usepackage{listings}
+
+\let\mathcup\cup
+\usepackage{musixtex}
+\let\musixcup\cup
+
+\DeclareRobustCommand*{\cup}{%
+  \ifmmode
+    \expandafter\mathcup
+  \else
+    \expandafter\musixcup
+  \fi
+}
 
 %DO NOT PLACE ANY PACKAGES AFTER THE HYPERREF SET UP
 \hypersetup{colorlinks=true,linkcolor=blue,anchorcolor=blue,citecolor=blue,filecolor=blue,urlcolor=blue,bookmarksnumbered=true,pdfview=FitB}
