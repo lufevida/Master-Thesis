@@ -60,6 +60,11 @@ In the productions above, we note that non-zero integer literals are not allowed
 \subsubsection{Lambda Expressions}
 
 \begin{itemize}
+	\item lambdaLitExpression := (paramDeclaration)$^*$ expression
+	\item lambdaLitBlock := (paramDeclaration)$^*$ returnBlock
+	\item returnBLock := (assignmentDec $|$ statement)$^*$ expression
+
+
 	\item factor := lambdaApp $|$ lambdaComp $|$ lambdaLit $|$ lambdaBlock
 	\item lambdaApp := identExpression \texttt{LPAREN} expression (\texttt{COMMA} expression)$^*$ \texttt{RPAREN}
 	\item lambdaComp := identExpression (\texttt{DOT} expression)$^*$
@@ -71,32 +76,9 @@ In the productions above, we note that non-zero integer literals are not allowed
 	\item retExpression := \texttt{KW\_RETURN} expression
 \end{itemize}
 
-\subsubsection{Statements}
-
-The latter set is, similarly to the \il{declaration} rule, the union of all keywords in the language, seen as tokens, that define a valid statement.
-
-\begin{itemize}
-	\item statement := assignmentStatement $|$ ifStatement $|$ whileStatement
-	\item statement := printStat $|$ plotStat $|$ playStat $|$ writeStat
-	\item assignmentStatement := \texttt{IDENT} \texttt{ASSIGN} expression
-	\item ifStatement := \texttt{KW\_IF} expression block
-	\item whileStatement := \texttt{KW\_WHILE} expression block
-	\item block := \texttt{LBRACE} (assignmentDeclaration $|$ statement)$^*$ \texttt{RBRACE}
-	\item printStat := \texttt{KW\_PRINT} \texttt{LPAREN} expression \texttt{RPAREN}
-	\item plotStat := \texttt{KW\_PLOT} \texttt{LPAREN} expression \texttt{COMMA} expression \texttt{COMMA} expression \texttt{RPAREN}
-	\item playStat := \texttt{KW\_PLAY} \texttt{LPAREN} expression \texttt{COMMA} expression \texttt{RPAREN}
-	\item writeStat := \texttt{KW\_WRITE} \texttt{LPAREN} expression \texttt{COMMA} expression \texttt{COMMA} expression \texttt{RPAREN}
-\end{itemize}
-
 \subsection{The Abstract Syntax}
 
 \begin{itemize}
-	\item AssignmentDeclaration := Type \texttt{IDENT} Expression
-	\item FieldDeclaration := Type \texttt{IDENT} Expression
-	\item LambdaLitDeclaration := Type \texttt{IDENT} LambdaLitExpression
-	\item LambdaLitDeclaration := Type \texttt{IDENT} LambdaLitBlock
-	\item Type := \texttt{INT} $|$ \texttt{FLOAT} $|$ \texttt{BOOL} $|$ \texttt{STRING} $|$ \texttt{ARRAY} $|$ \texttt{LAMBDA}
-
 	\item Expression := BinaryExpression $|$ IdentExpression $|$ LiteralExpression
 	\item Expression := ArrayExpression $|$ UnaryExpression $|$ FrameworkExpression
 	\item Expression := LambdaExpression
@@ -107,47 +89,11 @@ The latter set is, similarly to the \il{declaration} rule, the union of all keyw
 	\item LambdaLit := ParamDeclaration$^+$ Expression
 	\item LambdaBlock := ParamDeclaration$^+$ ReturnExpression
 	\item ParamDeclaration := Type IDENT
-	
-	\item Statement := AssignmentStatement $|$ IfStatement $|$ WhileStatement
-	\item Statement := PrintStatement $|$ PlotStatement $|$ PlayStatement $|$ WriteStatement
-	\item AssignmentStatement := \texttt{IDENT} Expression
-	\item IfStatement := Expression Block
-	\item WhileStatement := Expression Block
-	\item Block := (AssignmentDeclaration $|$ Statement)$^*$
-	\item PrintStatement := Expression
-	\item PlotStatement := Expression_0 Expression_1 Expression_2
-	\item PlayStatement := Expression_0 Expression_1
-	\item WriteStatement := Expression_0 Expression_1 Expression_2
 \end{itemize}
 
 \section{Type-Checker Rules}
 
 \begin{itemize}
-	\item UnassignedDeclaration:
-		\subitem Variable may not be declared more than once in the same scope
-	\item AssignmentDeclaration:
-		\subitem Variable may not be declared more than once in the same scope
-		\subitem Type = Expression.type
-	\item AssignmentStatement:
-		\subitem Variable must have been declared in some enclosing scope
-		\subitem Declaration.Type = Expression.type
-	\item IfStatement:
-		\subitem Expression.type = BOOL
-	\item WhileStatement:
-		\subitem Expression.type = BOOL
-	\item PrintStatement:
-		\subitem Expression.type != ARRAY $|$ FORMAT $|$ FILTER $|$ WAVEFORM
-	\item PlotStatement:
-		\subitem Expression_0.type = STRING
-		\subitem Expression_1.type = ARRAY
-		\subitem Expression_2.type = INT $|$ FLOAT
-	\item PlayStatement:
-		\subitem Expression_0.type = ARRAY
-		\subitem Expression_1.type = FORMAT
-	\item WriteStatement:
-		\subitem Expression_0.type = ARRAY
-		\subitem Expression_1.type = STRING
-		\subitem Expression_2.type = FORMAT
 	\item UnaryExpression:
 		\subitem Type = Expression.type
 		\subitem Expression.type = INT $|$ FLOAT $|$ BOOL
@@ -169,42 +115,21 @@ The latter set is, similarly to the \il{declaration} rule, the union of all keyw
 		\subitem Type = STRING
 	\item ArrayLitExpression:
 		\subitem Type = ARRAY
-	\item InfoExpression:
-		\subitem Type = STRING
-	\item FormatExpression:
-		\subitem Type = FORMAT
-	\item WaveformExpression:
-		\subitem Type = WAVEFORM
-	\item FilterExpression:
-		\subitem Type = FILTER
 	\item ReadExpression:
 		\subitem Type = ARRAY
 		\subitem Expression_0.type = STRING
 		\subitem Expression_1.type = FORMAT
-	\item PanExpression:
-		\subitem Type = ARRAY
-		\subitem Expression_0.type = ARRAY
-		\subitem Expression_1.type = INT $|$ FLOAT $|$ ARRAY
 	\item RecordExpression:
 		\subitem Type = ARRAY
 		\subitem Expression.type = INT $|$ FLOAT
-	\item TrackExpression:
-		\subitem Type = ARRAY
-		\subitem Expression_0.type = ARRAY
-		\subitem Expression_1.type = INT $|$ FLOAT
-		\subitem Expression_2.type = INT $|$ FLOAT $|$ ARRAY
-		\subitem Expression_3.type = INT $|$ FLOAT $|$ ARRAY
-	\item MixExpression:
-		\subitem Type = ARRAY
-		\subitem Expression.type = ARRAY
 	\item FuncLitExpression:
 		\subitem type = FUNC
 		\subitem inputType = UnassignedDeclaration.type
 		\subitem returnType = Expression.type
-	\item FuncApplicationExpression:
+	\item FuncAppExpression:
 		\subitem type = IdentExpression.returnType
 		\subitem Expression.type = IdentExpression.inputType
-	\item FuncCompositionExpression:
+	\item FuncCompExpression:
 	\begin{itemize}
 		\item Every lambda must have been declared in some enclosing scope
 		\item The return type of each lambda must match the input type of the next 

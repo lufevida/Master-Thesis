@@ -125,18 +125,21 @@ In this section, we describe in detail every syntactical construct of \emph{Scan
 At the topmost level of a \emph{Scandal} program, there are basically only two kinds of constructs that are allowed, namely declarations and statements. The legal declarations at this level are further subdivided into three: assignment declarations, field declarations, and lambda literal declarations. In the productions that follow, the star symbol represents a \emph{Kleene} star, and or-symbols and parenthesis are not tokens in the language. As a rule, terminal symbols will be given by their names, like \texttt{OR}, to avoid confusion with symbols in the language's grammar. Below are the production rules for \il{program}:
 
 \begin{itemize}
-	\item type := \texttt{KW\_INT} $|$ \texttt{KW\_FLOAT} $|$ \texttt{KW\_BOOL} $|$ \texttt{KW\_STRING} $|$ \texttt{KW\_ARRAY} $|$ \texttt{KW\_LAMBDA}
-	\item declaration := assignmentDec $|$ fieldDec $|$ lambdaLitDec $|$ paramDec
-	\item program := (assignmentDec $|$ fieldDec $|$ lambdaLitDec $|$ statement)$^*$
+	\item types := \texttt{KW\_INT} $|$ \texttt{KW\_FLOAT} $|$ \texttt{KW\_BOOL} $|$ \texttt{KW\_STRING} $|$ \texttt{KW\_ARRAY} $|$ \texttt{KW\_LAMBDA}
+	\item declaration := assignmentDeclaration $|$ fieldDeclaration
+	\item declaration := lambdaLitDeclaration $|$ paramDeclaration
+	\item program := (assignmentDeclaration $|$ fieldDeclaration)$^*$
+	\item program := (lambdaLitDeclaration $|$ statement)$^*$
 \end{itemize}
 
-In the AST, \il{Declaration} is an abstract class that has two subclasses: \il{AssignmentDeclaration}, and \il{ParamDeclaration}. The former has two subclasses, \il{FieldDeclaration}, and \il{LambdaLitDeclaration}. The primary difference between the two subclasses of \il{Declaration} is that the latter defines a type and a name without binding any value to that name at the time of declaration, while the former requires that some expression be given at the moment the variable is declared. It follows every variable declaration in \emph{Scandal} must be initialized, except when they are parameters of a lambda literal, in which case they actually cannot be initialized. A \il{program} can contain any number of \il{assignmentDec}, \il{fieldDec}, or \il{lambdaLitDec}, in any order, while a \il{paramDec} only exist in the context of a lambda literal. As will be seen below, every \il{declaration} begins with a type token, or with a \il{field} flag, followed by a type token. The abstract syntax of \il{Program} is then:
+In the AST, \il{Declaration} is an abstract class that has two subclasses: \il{AssignmentDeclaration}, and \il{ParamDeclaration}. The former has two subclasses, \il{FieldDeclaration}, and \il{LambdaLitDeclaration}. The primary difference between the two subclasses of \il{Declaration} is that the latter defines a type and a name without binding any value to that name at the time of declaration, while the former requires that some expression be given at the moment the variable is declared. It follows every variable declaration in \emph{Scandal} must be initialized, except when they are parameters of a lambda literal, in which case they actually cannot be initialized. A \il{program} can contain any number of \il{assignmentDec}, \il{fieldDec}, or \il{lambdaLitDec}, in any order, while a \il{paramDec} only exist in the context of a lambda literal. As will be seen below, every \il{declaration} begins with a type token, or with a \il{field} flag, followed by a type token. After parsed, types are converted into an enumeration case, according to the keyword at hand. The abstract syntax of \il{Program} is then:
 
 \begin{itemize}
+	\item Types := \texttt{INT} $|$ \texttt{FLOAT} $|$ \texttt{BOOL} $|$ \texttt{STRING} $|$ \texttt{ARRAY} $|$ \texttt{LAMBDA}
 	\item Declaration := AssignmentDeclaration $|$ FieldDeclaration
 	\item Declaration := LambdaLitDeclaration $|$ ParamDeclaration
-	\item Program := (AssignmentDeclaration $|$ FieldDeclaration)$^*$
-	\item Program := (LambdaLitDeclaration $|$ Statement)$^*$
+	\item Program := (LambdaLitDeclaration $|$ FieldDeclaration)$^*$
+	\item Program := (AssignmentDeclaration $|$ Statement)$^*$
 \end{itemize}
 
 The parsing routine for \il{program} is very simple, and constructs an instance of \il{Program} by checking whether the next token in the array of tokens produced by the scanner is in the FIRST set of \il{declaration}. If it is, we attempt to construct an instance or subclass of \il{AssignmentDeclaration}, consuming in the process all the tokens therein. If not, we attempt to construct a subclass of the abstract type \il{Statement}. That is done much that same way, by looking at the set FIRST(\il{statement}). Listing \ref{alg:program} shows how a concrete \il{program} is converted into a \il{Program} node in the AST.
@@ -178,15 +181,14 @@ Finally, we visit the \il{main} method in the \emph{Java} class, which is shown 
 The class \il{Declaration} is an abstract type that extends \il{Node} by adding three instance variables, namely a \il{Token} to hold the name we are declaring, an integer to hold its slot number, and a boolean property to distinguish whether this is a field or not. Slot numbers are not necessary for fields, hence are only used in the context of the \emph{Java} class' \il{run} method. \il{Declaration} branches out into two non-abstract subclasses, \il{ParamDeclaration} and \il{AssignmentDeclaration}. The latter has itself two other subclasses, \il{FieldDeclaration} and \il{LambdaLitDeclaration}. As discussed above, the difference is that \il{ParamDeclaration} only occurs inside a \il{LambdaLitDeclaration}; \il{FieldDeclaration} and \il{LambdaLitDeclaration} only occur at the outermost scope; and \il{AssignmentDeclaration} occurs anywhere. Below are the production rules for the concrete syntax of declarations in \emph{Scandal}.
 
 \begin{itemize}
-	\item paramDeclaration := type \texttt{IDENT}
-	\item assignmentDeclaration := type \texttt{IDENT} \texttt{ASSIGN} expression
-	\item fieldDeclaration := \texttt{KW\_FIELD} assignmentDeclaration
-	\item lambdaAssignment := \texttt{KW\_LAMBDA} \texttt{IDENT} \texttt{ASSIGN} (paramDeclaration)$^*$
-	\item lambdaLitDeclaration := lambdaAssignment lambdaLit
-	\item lambdaLitDeclaration := lambdaAssignment lambdaBlock
+	\item paramDeclaration := types \texttt{IDENT}
+	\item assignmentDeclaration := types \texttt{IDENT} \texttt{ASSIGN} expression
+	\item fieldDeclaration := \texttt{KW\_FIELD} types \texttt{IDENT} \texttt{ASSIGN} expression	
+	\item lambdaLitDeclaration := \texttt{KW\_LAMBDA} \texttt{IDENT} \texttt{ASSIGN} lambdaLitExpression
+	\item lambdaLitDeclaration := \texttt{KW\_LAMBDA} \texttt{IDENT} \texttt{ASSIGN} lambdaLitBlock
 \end{itemize}
 
-\begin{lstlisting}[language=Java,caption={Parsing Top-Level Declarations.},label={alg:assign}]
+\begin{lstlisting}[basicstyle=\scriptsize,language=Java,caption={Parsing Top-Level Declarations.},label={alg:assign}]
 public AssignmentDeclaration assignmentDeclaration() throws Exception {
 	boolean isField = token.kind == KW_FIELD;
 	if (isField) consume();
@@ -201,7 +203,15 @@ public AssignmentDeclaration assignmentDeclaration() throws Exception {
 }
 \end{lstlisting}
 
-As shown in line 5 of Listing \ref{alg:program}, we parse declarations by looking at the very first token at hand. In particular, we have FIRST(\il{declaration}) = \il{type} $\cup$ \texttt{KW\_FIELD}. Observing that \il{FieldDeclaration} is the only subclass of \il{Declaration} that may make use of a \il{field} flag, we can begin parsing declarations by first checking whether the first token of a declaration is indeed a \il{field} flag, setting a local boolean property accordingly, and consuming the \texttt{KW\_FIELD} token, as shown in line 2 of Listing \ref{alg:assign}. We then store the type and identifier tokens, consume the equals sign and delegate the expression rule to the \il{expression} routine. Based on which type of expression we receive, we create the corresponding subclass of \il{AssignmentDeclaration}. Even though lambda literal declarations are always fields in the \emph{Java} class, the \il{field} flag is not necessary, but \emph{can} be used without errors, since all that determines an instance of \il{LambdaLitDeclaration} is that the expression it contains is a subclass of \il{LambdaLitExpression}. Unassigned declarations, on the other hand, will fail the \il{match(ASSIGN)} call in line 6, and will cause a compilation error.
+As shown in line 5 of Listing \ref{alg:program}, we parse declarations by looking at the very first token at hand. In particular, we have FIRST(\il{declaration}) = \il{type} $\cup$ \texttt{KW\_FIELD}. Observing that \il{FieldDeclaration} is the only subclass of \il{Declaration} that may make use of a \il{field} flag, we can begin parsing declarations by first checking whether the first token of a declaration is indeed a \il{field} flag, setting a local boolean property accordingly, and consuming the \texttt{KW\_FIELD} token, as shown in line 2 of Listing \ref{alg:assign}. We then store the type and identifier tokens, consume the equals sign and delegate the expression rule to the \il{expression} routine. Based on which type of expression we receive, we create the corresponding subclass of \il{AssignmentDeclaration}. Even though lambda literal declarations are always fields in the \emph{Java} class, the \il{field} flag is not necessary, but \emph{can} be used without errors, since all that determines an instance of \il{LambdaLitDeclaration} is that the expression it contains is a subclass of \il{LambdaLitExpression}. Unassigned declarations, on the other hand, will fail the \il{match(ASSIGN)} call in line 6, and will cause a compilation error. Below are the abstract syntax rules for declarations. In these abstract rules, an \texttt{IDENT} has a different meaning than its concrete counterpart. Here it is an instance of \il{Token}, rather than a character string.
+
+\begin{itemize}
+	\item ParamDeclaration := Types Token.\texttt{IDENT}
+	\item AssignmentDeclaration := Types Token.\texttt{IDENT} Expression
+	\item FieldDeclaration := Types Token.\texttt{IDENT} Expression
+	\item LambdaLitDeclaration := Types.\texttt{LAMBDA} Token.\texttt{IDENT} LambdaLitExpression
+	\item LambdaLitDeclaration := Types.\texttt{LAMBDA} Token.\texttt{IDENT} LambdaLitBlock
+\end{itemize}
 
 \subsubsection{The \il{ParamDeclaration} Class}
 
@@ -233,6 +243,175 @@ lambda higherOrder = float x -> lambda f -> {
 
 When a lambda expression in \emph{Scandal} has a parameter of type \il{lambda}, we have no mechanism in the language to tell what parameter types pertain to said lambda. The corresponding construction in \emph{Java} is an instance of the \il{Function} interface, which is a parameterized type. A lambda expression in \emph{Java} that takes a float and returns a float has type \il{Function<Float, Float>}, for example. It has been a design choice so far in \emph{Scandal} not to introduce parameterized types, and attempt instead at some yet crude type inference mechanism. It is a long-term goal to actually make \emph{all} types inferred. In Listing \ref{alg:infer}, we have an instance of \il{ParamDeclaration} that defines a variable \il{f} of type \il{lambda}. Inside the block, the mechanism of choice to in fact \emph{declare} what parameter types \il{f} has is through an assignment declaration. In line 3, we apply \il{x} to \il{f} and store the result in \il{val}. Since both \il{x} and \il{val} have type \il{float}, we are now at a position to determine with that \il{f} takes a single argument of type \il{float}, and returns also a float. Note that omitting line 3 and putting \il{return f(x)} instead would cause a compilation error, exactly because we cannot infer parameter types of a lambda expression inside a lambda literal if there is no application thereof.
 
-Given the discussion above, whenever an assignment declaration calls \il{expression.decorate}, and this expression happens to be a lambda application inside a lambda literal, instead of expecting the call to \il{expression.decorate} to define a type for the expression, we actually decorate the expression ourselves. The process is very simple: after calling \il{expression.decorate}, we check if the expression is an instance of \il{LambdaAppExpression}. If so, we look for the declaration of that application's expression. If the declaration is an instance of \il{ParamDec}, we know our expression is an application of a lambda is a parameter of lambda literal expression, since parameter declarations only ever exist in this context. We then trust the programmer will make use of the lambda literal expression correctly, by applying to it a lambda expression that has the same parameter types as those inferred inside the block. If not, a runtime error will occur. This is obviously not a complete implementation and, as discussed previously, future versions of \emph{Scandal} will throw a compilation error instead. Finally, the \il{expression} property will have to have a type, which we check against the declaration type. Naturally, in the special case we decorate the expression ourselves, this test never fails. If it does, we throw a compilation error. Overriding the \il{generate} method inside an assignment declaration is straightforward. We make a call to \il{expression.generate}, which causes the expression value to be left on top of the JVM stack, after which we switch over the expression type, using the appropriate JVM instruction to store the variable.
+Given the discussion above, whenever an assignment declaration calls \il{expression.decorate}, and this expression happens to be a lambda application inside a lambda literal, instead of expecting the call to \il{expression.decorate} to define a type for the expression, we actually decorate the expression ourselves. The process is very simple: after calling \il{expression.decorate}, we check if the expression is an instance of \il{LambdaAppExpression}. If so, we look for the declaration of that application's expression. If the declaration is an instance of \il{ParamDec}, we know our expression is an application of a lambda is a parameter of lambda literal expression, since parameter declarations only ever exist in this context. We then trust the programmer will make use of the lambda literal expression correctly, by applying to it a lambda expression that has the same parameter types as those inferred inside the block. If not, a runtime error will occur. This is obviously not a complete implementation and, as discussed previously, future versions of \emph{Scandal} will throw a compilation error instead. Finally, the \il{expression} property will have to have a type, which we check against the declaration type. Naturally, in the special case we decorate the expression ourselves, this test never fails. If it does, we throw a compilation error. Overriding the \il{generate} method inside an assignment declaration is straightforward. We make a call to \il{expression.generate}, which causes the expression value to be left on top of the JVM stack, after which we switch over the expression type, using the appropriate JVM instruction to store the variable. We end this section with a summary of the type-checker rules for all subclasses of \il{Declaration}.
+
+\begin{itemize}
+	\item AssignmentDeclaration:
+		\begin{itemize}
+			\item Must not be declared more than once in the same scope
+			\item Type = Expression.type
+		\end{itemize}
+	\item FieldDeclaration:
+		\begin{itemize}
+			\item Must be declared in the outermost scope
+			\item Must not be declared more than once
+			\item Type = Expression.type
+		\end{itemize}
+	\item LambdaLitDeclaration:
+		\begin{itemize}
+			\item Must be declared in the outermost scope
+			\item Must not be declared more than once
+			\item Type = Types.\texttt{LAMBDA}
+		\end{itemize}
+	\item ParamDeclaration:
+		\begin{itemize}
+			\item Must not be declared more than once
+		\end{itemize}
+\end{itemize}
 
 \subsection{Subclasses of \il{Statement}}
+
+Statements and declarations are the only types of top-level constructs that \emph{Scandal} supports. Even blocks are not allowed on their own, and may only occur in the context of a statement or lambda literal expression. That said, statements can occur freely inside any scope, and are essential for the language in that they provide much its core functionality. In many cases, statements are what allow \emph{Scandal} to remain restricted to its domain, providing hooks to \emph{Java} routines that, if ported to the DSL, would challenge its very purpose. In this sense, much of what it means to improve the language's domain, like its ability to produce user-interface elements, for example, will depend on how new types of statements are introduced. As a language designer, one cannot help but wonder about the trade-offs of such endeavor. A good balance between introducing new features while maintaining scalability is always delicate. On one hand, new features are necessary to provide more functionality. On the other, every bit of functionality that \emph{can} be achieved in terms of the language alone, even if more difficult to implement, must be given priority. If the language only grows in terms of its \emph{Java} underlying implementation, the structure of the compiler and its production rules become increasingly harder to maintain. This philosophy has been the main driving force behind giving \emph{Scandal} a functional flavor. It is also diametrically opposite to the concept of unit generators, although one can still hide implementation in \emph{Scandal}, but the converse is true in general for strict unit-generator languages. As seen above in Listing \ref{alg:program}, parsing statements is accomplished much the same way we parse declarations, by looking at the set FIRST set of \il{statement}. Below are the productions for the concrete syntax of \emph{Scandal} statements.
+
+\begin{itemize}
+	\item statement := importStatement $|$ assignmentStatement $|$ indexedAssignStat
+	\item statement := ifStatement $|$ whileStatement $|$ printStatement
+	\item statement := playStatement $|$ plotStat $|$ writeStat
+	\item importStatement := \texttt{KW\_IMPORT} \texttt{LPAREN} expression \texttt{RPAREN}
+	\item assignmentStatement := \texttt{IDENT} \texttt{ASSIGN} expression
+	\item indexedAssignStat := \texttt{IDENT} \texttt{LBRACKET} expression \texttt{RBRACKET} \texttt{ASSIGN} expression
+	\item ifStatement := \texttt{KW\_IF} expression block
+	\item whileStatement := \texttt{KW\_WHILE} expression block
+	\item block := \texttt{LBRACE} (assignmentDeclaration $|$ statement)$^*$ \texttt{RBRACE}
+	\item printStatement := \texttt{KW\_PRINT} \texttt{LPAREN} expression \texttt{RPAREN}
+	\item playStatement := \texttt{KW\_PLAY} \texttt{LPAREN} expression \texttt{COMMA} expression \texttt{RPAREN}
+	\item plotStat := \texttt{KW\_PLOT} \texttt{LPAREN} expression \texttt{COMMA} expression \texttt{COMMA} expression \texttt{RPAREN}
+	\item writeStat := \texttt{KW\_WRITE} \texttt{LPAREN} expression \texttt{COMMA} expression \texttt{COMMA} expression \texttt{RPAREN}
+\end{itemize}
+
+Except for assignment statements, whose first token is an identifier, every statement in the language begins with a keyword. The \il{statement} routine in the parser contains a \il{switch} with cases for \texttt{IDENT} and every statement keyword, and defaults to throwing an error if the first token given does not match any of these kinds. Depending on the keyword, the parser instantiates one of the particular subclasses of \il{Statement}. There are basically four varieties of statements in \emph{Scandal}: compiler statements, assignment statements, control statements, and framework statements. Compiler statements are restricted to import statements at the moment. As the language grows in terms of itself, likely there will be need in the future for compiler statements that aid in API documentation, such as double-star comments that are used to generate a web page, say. Assignments simply bind a new expression to a previously declared variable. Control statements are if and while-loops. Switches, repeat-while-loops, and for-loops are not yet included, but intended. Framework statements define the specific domain of the language, and consist of four hooks to the \emph{Java} audio engine, namely routines to print to the console, playback a buffer of audio data with a given number of channels, plot a decimated array of floats, and write a \emph{.wav} file to disk. Framework statements may be regarded as \il{void} methods, since they never return anything. There exist other hard-wired routines in \emph{Scandal} that do return some expression, and are thus treated as such and discussed later. The \il{Statement} class extends \il{Node} but is itself abstract. It is constructed with an instance of \il{Token}, that in turn is used to call the superclass' constructor, and an instance of \il{Expression}. Every statement in \emph{Scandal} contains at least one expression, but their purposes vary according to the statement type. In converting from concrete rules into abstract ones, assignments, parenthesis, commas, and braces are all discarded, and most statements are in essence a collection of expressions. The exceptions are conditional statements, which also contain blocks. Below are the abstract syntax rules for statements.
+
+\begin{itemize}
+	\item Statement := ImportStatement $|$ AssignmentStatement $|$ IndexedAssignStat
+	\item Statement := IfStatement $|$ WhileStatement $|$ PrintStatement
+	\item Statement := PlotStatement $|$ PlayStatement $|$ WriteStatement
+	\item ImportStatement := Expression
+	\item AssignmentStatement := \texttt{IDENT} Expression
+	\item IndexedAssignStat := \texttt{IDENT} Expression\_0 Expression\_1
+	\item IfStatement := Expression Block
+	\item WhileStatement := Expression Block
+	\item Block := (AssignmentDeclaration $|$ Statement)$^*$
+	\item PrintStatement := Expression
+	\item PlotStatement := Expression\_0 Expression\_1 Expression\_2
+	\item PlayStatement := Expression\_0 Expression\_1
+	\item WriteStatement := Expression\_0 Expression\_1 Expression\_2
+\end{itemize}
+
+\subsubsection{The \il{ImportStatement} Class}
+
+Import statements are the simplest type of statement in \emhp{Scandal}. The \il{ImportStatement} class extends \il{Statement}, but adds no properties to it. Even though they belong to the AST, no bytecode is ever generated for import statements. We still need to implement \il{generate}, but we simply do nothing there. The decoration phase begins by checking the current scope number in the symbol table is zero, since we can only import in the outermost scope. If not, we throw an error. Next, it calls \il{expression.decorate} and, after the expression has been decorated with a type, we check to see whether that is indeed a string, throwing an exception if not, and return. Import statements are used by the compiler as described in Listing \ref{alg:link}, wherein all import statements in a chain of linked programs form a DAG. We depth-first search the DAG by pre-compiling every program, that is, creating an AST for them without decorating or generating bytecode. Paths are then extracted from import statements in order, which effectively creates a reverse topological sorting of the graph. If the chain of programs contains a cycle, then execution will fail at runtime. As discussed above, future versions of \il{Scandal} will check for backward edges in the DAG, and throw a more informative compilation error instead.
+
+At the moment, each import statement accepts a single expression of type \il{string}, but extending this implementation to allow comma-separated expressions would be fairly trivial. In designing a language, one must consider whether such implementation would \emph{actually} improve the language. \emph{Java} only supports single import statements and that can cause some clutter in the document header. Good IDE's will collapse import statements, which mitigate the cluttering somehow. With \emph{Go}, on the other hand, one is allowed to have multiple import statements, declared as comma-separated strings. More often than not, though, these strings are quite long, and eventually are broken into multiple lines. In \emph{Scandal}, import statements take paths to files in the file system, which may be fairly long strings. The syntax is very similar to \emph{Go}, however only single import statements are allowed, like \emph{Java}, and the ability to collapse import statements in the IDE will likely take precedence over multiple import statements in the future.
+
+\subsubsection{Assignment Statements}
+
+The \il{AssignmentStatement} class extends \il{Statement} by including a \il{declaration} property and, naturally, overriding both \il{decorate} and \il{generate}. In the decoration phase, we look for a declaration value whose key corresponds to the identifier we hold in \il{firstToken.text}, starting from the innermost (topmost) scope, and descending to the bottom of the stack of symbol tables, as needed. Contrary to assignment declarations, if \emph{no} declaration is found, we throw an error. We then delegate decoration of the \il{expression} property to the corresponding subclass of \il{Expression}. The exact same caveat with type inference in instances of \il{LambdaAppExpression} applies here, so we check whether we are a lambda application of a lambda parameter inside a return block, and decorate the lambda application expression with our declaration's type. After that, we check if the type of our declaration corresponds to the type of our expression, and throw an error if there is a mismatch.
+
+The \il{generate} method is somewhat more complicated, since the \il{Function} interface in \emph{Java} only handles classes and not primitive types. This restriction applies in \emph{Scandal} to integers, floats, and booleans, which are implemented as primitives, and must therefore be wrapped in a \emph{Java} class, namely \il{Integer}, \il{Float}, and \il{Boolean}, in order to be assigned to parameters in a lambda literal expression. The other three types in \il{Scandal}, namely strings, arrays, and lambdas, all correspond to class types in \emph{Java}, hence do not require any conversion. Before assigning to any variable, we always leave an expression value on top of the JVM stack. Whenever assigning to a parameter variable inside a lambda block, if the expression's type correspond to a primitive in \emph{Scandal}, we wrap the primitive on top of the JVM stack into the appropriate \emph{Java} class. We check that by testing whether our \il{declaration} property is an instance of \il{ParamDeclaration}, which immediately tells us we are inside a lambda block. Otherwise, we test if the \il{declaration} is an instance of \il{FieldDeclaration}, in which case we use the correct bytecode instruction to assign to the variable. If both tests fail, then we must be a local variable, either in the context of \il{run} or local to a lambda body, hence we need to make the correct store call, and provide a slot number. The former is determined by the \il{type} property, while the latter is retrieved from the \il{declaration} property.
+
+\il{AssignmentDeclaration} has a subclass that specializes in assigning float values to an array at particular indices. Naturally, we need to extend \il{AssignmentDeclaration} by including an expression property that holds the index at which we are assigning. We parse indexed assignment statements alongside its superclass by observing that PREDICT(\il{indexedAssignmentStatement}) = PREDICT(\il{assignmentStatement}), and differentiate between indexed and non-indexed assignments by consuming the identifier, then checking if the next token is a left bracket. An instance of \il{IndexedAssignmentStatement} is constructed by passing constructing the superclass, then storing the the \il{index} expression. Decoration is similar to the superclass in it checks the symbol table to see whether the identifier has been declared, throwing an error if not. In addition, we must check if the declaration associated to the identifier has indeed type \il{array}, otherwise an error is thrown. We then delegate the decoration of the \il{index} property to the appropriate subclass of \il{Expression}, as usual. Contrary to most descendants of \emph{C}, however, we do allow arrays to be indexed by expressions of type \il{float} in \emph{Scandal}, in which case we simply take the integer part of the number in the generation phase. Hence we check the type of \il{index}, throwing an error if its neither an integer nor a float. We decorate the \il{expression} property in a similar way, however here too care must be taken with higher-order functions. We check for those exactly the same way we do in the superclass, decorating the \il{expression} property as needed. Like indices, we overload the \il{expression} property to accept integers, as well, converting to float in the generation phase before storing. When decorating a lambda application inside a lambda block, we naturally always set it to \il{Types.FLOAT}.
+
+Generating an indexed assignment statement is done a little differently from the superclass in it involves loading the array first on top of the JVM stack, which we do by asking the \il{declaration} property for a slot number. After that, we ask \il{index} to generate itself. If the index is a float, we call the \il{F2I} instruction, which pops the float and pushes its integer part on top of the JVM stack. Similarly, we ask \il{expression} to generate itself and, if needed, convert it to float by calling the \il{I2F} JVM instruction. Finally, the \il{FASTORE} assigns the value on top of the stack to the array at the desired index, eventually popping the three topmost elements from the JVM stack.
+
+\subsubsection{Control Statements}
+
+Both control statements in \emph{Scandal} extend \il{Node} by including a \il{block} property. The basic functionality of a block is to introduce a new scope of declarations and statements, that are executed once or more times, depending on the type of conditional, should the test following the conditional keyword succeed. The \il{Block} class, in turn, extends \il{Node} by including an array of nodes, similarly to the \il{Program} class. Like the latter, these nodes may be declarations or statements, but unlike the zeroth scope, we disallow import statements, since the compiler only ever looks for those in the topmost scope, as well as lambda literals and fields. The restriction for fields is aimed at forcing clarity among declarations. Again here, it would be trivial to allow them, but it is arguably confusing to declare a global variable inside an inner scope, so we forbid it. The restriction for lambda literals, however, is not deliberate, but rather the result of an incomplete implementation. A fair amount of bookkeeping goes into allowing lambda literal declarations into an inner scope. For one, these would need to be local variables, and currently all lambda literals are global. Moreover, local lambdas can always be achieved by copying a field, hence no additional functionality would be achieved, thus we omit their implementation in this proof of concept.
+
+Parsing blocks is very similar to parsing top-level constructs. The basic difference is that a block is surrounded by braces, thus we start by consuming the left brace. We then look for declarations or statements until we reach the right brace. The parser routines that create these declarations and statements are exactly the same that create top-level constructs. If a global variable declaration or an import statement is given to a block, the parser will take no notice of it. The error will be thrown by the respective AST nodes upon decoration, when the node itself asks the symbol table for its current scope number, throwing an error if the latter is not zero. Decorating and generating the block is similarly delegated to each node in the \il{nodes} array. While decorating, we introduce a new scope by calling \il{symtab.enterScope}, ask each node in the \il{nodes} array to decorate itself, then call \il{symtab.leaveScope}. While generating we iterate over the \il{nodes} array, asking each node to generate itself.
+
+We parse conditional statements by consuming the first token, asking the \il{expression} method in the parser for an expression, and finally asking the \il{block} method for a block. Decorating if and while-statements is identical. We first ask the \il{expression} property to decorate itself, then check whether it is of type boolean, otherwise we throw an error. Finally, we ask the block to decorate itself. The \il{generate} method naturally differs between both types of conditional statement. For an if-statement, we first ask the expression to generate itself, after which its value will be on top of the JVM stack. Next, we load a constant of value \il{true} on top of the stack. Interestingly, integer constants are used in the bytecode implementation of conditional statements, but not in \emph{Java}. Nor in \il{Scandal}, mostly for clarity. We then create an instance of \il{org.objectweb.asm.Label} which, upon calling \il{mv.visitLabel} creates a label instruction in bytecode. Before visiting the label, though, we compare both elements on top of the stack by calling creating an \il{IF_CMPNE} jump, and giving it the label we have just created as an argument. When called, it will pop both topmost elements and jump to the label if these elements are not equal. Since we know one of them has value true, we perform the jump only if the condition is false. What we jump over is exactly the contents of the block, thus we generate the block before we visit the label. The entire process is described in Listing \ref{alg:if}.
+
+\begin{lstlisting}[language=Java,caption={Generating If-Statements.},label={alg:if}]
+public void generate(MethodVisitor mv, SymbolTable symtab) throws Exception {
+	expression.generate(mv, symtab);
+	mv.visitInsn(ICONST_1);
+	Label label = new Label();
+	mv.visitJumpInsn(IF_ICMPNE, label);
+	block.generate(mv, symtab);
+	mv.visitLabel(label);
+}
+\end{lstlisting}
+
+Generating while-loops is analogous, but requires two labels, since we jump back to the first label while the condition is true. Naturally, the first thing we do is visit the first label, to establish that jump location. We then load the expression and a constant of value true, call \il{IF_CMPNE}, as with if-statements, passing as an argument the second label, which is yet to be visited. We then visit the block and add a \il{GOTO} instruction, giving it the first label as an argument, which causes the condition to be re-evaluated. If still true, we repeat the block. If not, we jump to the second label, whose visit is the last step in generating a while-loop. The actual bytecode implementation often involve more instructions, the generation thereof we gladly delegate to the ASM library. A more complete implementation of these two types of control statement would include handling the cases where, instead of a block, we allow a single statement to be executed should the condition succeed. Adding this functionality is trivial, but would improve readability since we would able to drop the surrounding brackets. A similar type of syntactic sugar has been implemented for lambda literal expressions. A \il{LambdaLitExpression} takes an array of parameters and returns an expression, whereas its subclass \il{LambdaLitBlock} contains, in addition, a \il{ReturnBlock}. When the body of a lambda literal consists of a return expression alone, we are able to drop the surrounding brackets and possible express the entire lambda in a single line.
+
+\subsubsection{Framework Statements}
+
+Print statements provide the functionality of printing to the IDE's console the value of strings, floats, integers, and booleans. They extend \il{Statement} by implementing both \il{decorate} and \il{generate}. As with import statements, print statements take a single expression as input, hence one needs a print statement for each variable one wishes to see posted on the console. Print statements are parsed by consuming and converting the \il{print} keyword into a \il{Token}, then asking the parser's \il{expression} routine for a subclass of \il{Expression}. We then use the token and expression to instantiate a \il{PrintStatement}, whose constructor simply calls to the superclass' constructor. Decoration asks the expression to decorate itself, after which we check if the expression type is either \il{array} or \il{lambda}, in which case we throw an error.
+
+Generating a print statements depends on whether we are running inside the IDE, or as a command-line tool, so we call \il{Platform.isFxApplicationThread} to check. In the latter case, we use \il{mv} to load \il{System.out}, then ask the expression to generate itself on top of the JVM stack, and finally use \il{mv} again to call \il{println} on \il{System.out}. In the former case, we use \il{mv} to load \il{language.ide.MainView.console}, which is an instance of \il{javafx.scene.control.TextArea}, and duplicate the top of the stack, for reasons we will explain momentarily. We then generate the expression on top of that, and test to see if the expression is of type \il{string}, in which case we call \il{String.valueOf}, since \il{TextArea} can only append to its contents a value of type \il{java.lang.String}. To actually append the string to whatever the console is displaying at the moment, we call \il{TextArea.appendText}, which pops the two topmost elements, namely the expression and the duplication of the console. We then push a new-line character and call \il{TextArea.appendText}, in order to create a nice line break. This causes the top of the stack to be popped twice, hence why we duplicated the console.
+
+Plot statements are absolutely fundamental to any digital signal processing development environment. Currently, \il{Scandal} supports static linear plots but, as the language evolves, there will be need for many other types of plots. These include logarithmic plots, plots of the complex plane, three-dimensional plots, spectrograms, as well as dynamic plots such as oscilloscopes. The \il{PlotStatement} class extends \il{Statement} by including two more expressions. The three expression properties are namely a string to display a title for the plot, an array of points to be plotted, and an integer defining the number of points to be plotted. Since arrays of audio samples can be quite long, the last parameter is used to decimate an array if it is longer than the specified number of points. If it is shorter, the \il{PlotTab} class will oversample the array to have the specified length.
+
+\begin{figure}[b!]
+	\includegraphics[width=4.5in]{img/plot}
+	\caption[Plotting an array in \emph{Scandal}.]{Plotting an array in \emph{Scandal}.}
+\end{figure}
+
+\newpage
+
+We parse plot statements by consuming the keyword and a left parenthesis, then calling \il{expression} on the parser three times, consuming the commas in between. We next consume the right parenthesis, and return an instance of \il{PlotStatement}, whose constructor uses the keyword token and first expression to construct the superclass. Decoration of a plot statement is accomplished simply by asking each expression to decorate itself. We then type-check the first to be a string, the second to be an array, and overload the third to accept integers and floats. The generation phase checks, like we did with print statements, if we are running on the IDE. If not, we do not generate any bytecode, hence one cannot plot when running a \emph{Scandal} program from the command line. Otherwise, we use \il{mv} to push a new instance of \il{language.ide.PlotTab}, and push all three expressions on top of it. If the last expression has type float, we give the \il{F2I} instruction, and finally call \il{init} on the \il{PlotTab}, causing it to be displayed in the main view. We provide a thorough discussion of \emph{Scandal}'s IDE in the next chapter.
+
+Play statements take an array of audio samples and an integer number of channels, hence extend \il{Statement} by adding to id a second expression property. Parsing is done exactly the same way it is for plot statements, only we have here one less expression to parse. Decoration follows the same pattern, and requires that the first expression be an array, and the second be an integer. We here choose not to overload the integer expression, although it may be useful in the future to use floats in order to define a surround configuration, such as 5.1, or 8.4 speakers, where the decimal part corresponds to the number of sub-woofers in a speaker configuration. Like before, we check in the generation phase whether we are running inside the IDE. If not, we use \il{mv} to push a new instance of \il{AudioTask} onto the stack, then duplicate it, since we are using it twice. We then call \il{init} on the \il{AudioTask}, which pops the topmost of the two. We then generate both expressions, call \il{play} on the \il{AudioTask}, and return. If we are on the IDE, however, we push instead a new instance of \il{language.ide.WaveTab}. We then push a string containing the class name, which the symbol table holds, generate both expressions, and call \il{init} on the \il{WaveTab}. The string containing the class name is used as the tab's label. The \il{WaveTab} class in the IDE is a subclass of \il{PlotTab}, hence displays a plot of the array of samples, decimated to 1000 samples, in addition to playing it back, hence there one never needs to plot \il{and} play in a \emph{Scandal} program.
+
+The last type of framework statement in the language deals with saving a \emph{.wav} file to disk. Write statements take three arguments, namely the array containing audio samples, a string containing a path in the file system, and an integer number of channels. Parsing follows the same methodology of other framework statements, so does decoration. We do not overload the channel count, but we might in the future to support surround configurations, similarly to play statements. The code-generation routine uses \il{mv} to push a new instance of \il{framework.generators.AudioTask}, which we duplicate. We will discuss the audio engine's framework package in the next chapter. After calling \il{init} on the \il{AudioTask}, we push all expressions and \il{export} on \il{AudioTask}, which effectively saves the audio buffer as a \emph{.wav} at the specified path. We summarize below the type-checker rules for all subclasses of \il{Statement}.
+
+\begin{itemize}
+	\item ImportStatement:
+		\begin{itemize}
+			\item Must be stated in the outermost scope
+			\item Expression.type = Types.\texttt{STRING}
+		\end{itemize}
+	\item AssignmentStatement:
+		\begin{itemize}
+			\item Must have been declared in some enclosing scope
+			\item Declaration.Type = Expression.type
+		\end{itemize}
+	\item IndexedAssignmentStatement:
+		\begin{itemize}
+			\item Must have been declared in some enclosing scope
+			\item Declaration.Type = Types.\texttt{ARRAY}
+			\item Expression\_0.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Expression\_1.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+		\end{itemize}
+	\item IfStatement:
+		\begin{itemize}
+			\item Expression.type = Types.\texttt{BOOL}
+		\end{itemize}
+	\item WhileStatement:
+		\begin{itemize}
+			\item Expression.type = Types.\texttt{BOOL}
+		\end{itemize}
+	\item PrintStatement:
+		\begin{itemize}
+			\item Expression.type != Types.\texttt{ARRAY} $|$ Types.\texttt{LAMBDA}
+		\end{itemize}
+	\item PlotStatement:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{STRING}
+			\item Expression\_1.type = Types.\texttt{ARRAY}
+			\item Expression\_2.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+		\end{itemize}
+	\item PlayStatement:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{ARRAY}
+			\item Expression\_1.type = Types.\texttt{INT}
+		\end{itemize}
+	\item WriteStatement:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{ARRAY}
+			\item Expression\_1.type = Types.\texttt{STRING}
+			\item Expression\_2.type = Types.\texttt{INT}
+		\end{itemize}
+\end{itemize}
+
+\subsection{Subclasses of \il{Expression}}
