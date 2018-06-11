@@ -415,3 +415,123 @@ The last type of framework statement in the language deals with saving a \emph{.
 \end{itemize}
 
 \subsection{Subclasses of \il{Expression}}
+
+Expressions in \emph{Scandal} cannot be evaluated on their own, rather existing only in the context of a declaration or statement. The abstract class \il{Expression} has a very diverse family of subclasses, and extends \il{Node} by adding three static methods. These methods are type converters and will be discussed in the context of lambda expressions. \il{Expression} neither implements \il{decorate} or \il{generate}, nor adds any properties to \il{Node}, hence remaining a fairly general type of node. Given their diversity, and the fact that often expressions come as binary sub-trees of the AST, expressions are by very far the most difficult construct in the language to parse. The \il{expression} routine in the parser works by always looking for operator tokens, then forming a binary expression whenever applicable. Hence even when a simple literal expression is given, parsing thereof goes through several steps before delegating to the specific parsing routine for that particular type of literal. The concrete syntax rules for the various types of expressions reflect this fact in the sense that \emph{every} subclass of \il{Expression} is treated while parsing as a binary tree, even if it eventually turns out to be a trivial, single-leaf tree. The leaves are called factors in the production rules below. Above factors, there can be summands, and above summands there can be comparisons, depending on the precedence of the connecting operators. In \emph{Scandal}, we do not allow carets or double-stars for exponentiation. Should we do allow them in the future, they would need to be introduced in the rules below with a higher precedence than factors, that is, powers would need to replace factors as leaves.
+
+\begin{itemize}
+	\item expression := comparison (comparisonOp comparison)$^*$
+	\item comparisonOp := \texttt{LT} $|$ \texttt{LE} $|$ \texttt{GT} $|$ \texttt{GE} $|$ \texttt{EQUAL} $|$ \texttt{NOTEQUAL}
+	\item comparison := summand (summandOp summand)$^*$
+	\item summandOp := \texttt{PLUS} $|$ \texttt{MINUS} $|$ \texttt{OR}
+	\item summand := factor (factorOp factor)$^*$
+	\item factorOp := \texttt{TIMES} $|$ \texttt{DIV} $|$ \texttt{MOD} $|$ \texttt{AND}
+	\item factor := derivedExpression $|$ literalExpression $|$ arrayExpression
+	\item factor := frameworkExpression $|$ lambdaExpression
+\end{itemize}
+
+We begin parsing expressions by assuming the expression given is a binary expression containing a lowest-precedence comparison operator. Inside the \il{expression} routine in the parser, we create two expressions, one for each node of the binary sub-tree whose root we are attempting to create. We then ask the \il{comparison} routine to provide us with the left-hand side expression and test in a while-loop to see whether the next token is a comparison operator. If so, we ask \il{comparison} for the right-hand side expression and create an instance of \il{BinaryExpression} with the two expressions. While the next token is still a comparison operator, we keep asking \il{comparison} for a new right-hand side, then substitute our instance of \il{BinaryExpression} with another in which the left-hand side is the entire binary expression we parsed last, and the right-hand side is the last expression returned from the \il{comparison} method. In this fashion, we always associate equal-precedence operations from left to right. The \il{expression} routine is given below in Listing \ref{alg:expr}.
+
+\begin{lstlisting}[language=Java,caption={Parsing Expressions.},label={alg:expr}]
+public Expression expression() throws Exception {
+	Token firstToken = token;
+	Expression e0;
+	Token operator;
+	Expression e1;
+	e0 = comparison();
+	while (token.isComparison()) {
+		operator = consume();
+		e1 = comparison();
+		e0 = new BinaryExpression(firstToken, e0, operator, e1);
+	}
+	return e0;
+}
+\end{lstlisting}
+
+Inside \il{comparison}, we do exactly the same we do inside \il{expression}, only we check whether the operator token is at the precedence level of sums. We instantiate expressions inside \il{comparison} by calling the \il{summand} routine. The \il{summand} routine, in turn, does also exactly the same as \il{expression} and \il{comparison}, only checking whether operator tokens are at precedence level of products, which is the highest level of precedence among operator tokens in \emph{Scandal}. Inside \il{summand}, we instantiate expressions by calling the \il{factor} routine. The latter returns a leaf in the binary tree by looking at the FIRST set of the \il{expression} rule, similarly to how we parse declarations and statements. Some factors, however, require more than one token of look-ahead, namely some of those that begin with an identifier. Inside the \il{factor} routine, then, whenever we see a token of kind \texttt{IDENT}, we look for the next token to determine whether we should parse the factor as an indexed array, a lambda application, a lambda composition, or simply an identifier expression. It turns out two tokens of look-ahead is enough to parse factors, which thus have a LL(2) grammar. We have the following abstract syntax rules for expressions, wherein the rules for operators are the same as the concrete rules, except that instead of strings of characters, we have instances of \il{Token}.
+
+\begin{itemize}
+	\item Expression := DerivedExpression $|$ LiteralExpression $|$ ArrayExpression
+	\item Expression := FrameworkExpression $|$ LambdaExpression $|$ BinaryExpression
+	\item BinaryExpression := Expression\_0 Operator Expression\_1
+	\item Operator := ComparisonOperator $|$ SummandOperator $|$ FactorOperator
+\end{itemize}
+
+\subsubsection{The \il{BinaryExpression} Class}
+
+Binary expressions extend \il{Expression} by overriding its abstract methods and adding three properties, namely a left-hand side expression, an operation token, and a right-hand expression. Decorating and generating binary expressions is somewhat involved, mostly due to the great variety of operations and their supported types. In addition, operators in \emph{Scandal} are overloaded to a certain extent, as to provide type polymorphism in binary expressions, which adds to the number of cases with which we must deal in decorating and generating expressions, but also make the DSL more concise and readable. Decorating a binary expression begins with asking both expressions to decorate themselves, after which their types will be non-null. Given the binary-tree nature of these expressions, this is accomplished recursively, hence we may be calling \il{decorate} on ourselves if one of the sub-expressions is itself a binary expression. Hence we need to have a type before returning from \il{decorate}. As a matter of fact, almost all we do next inside \il{decorate} is go over the different combinations of operations and types to determine what the overall type of the binary expression is. If we are given two expressions in any combination of integers or floats, we can perform arithmetic on those numbers. Note that arithmetic operators do not always have the same precedence amongst themselves. We then have two sub-cases. If both expressions are of type integer, then we decorate the resulting binary expression with an integer type. Otherwise, if at least one of the expressions has type float, the whole binary expression will have type float. If instead we are given any combination of integers, floats, or booleans, then we can use logical or comparison operators, remembering that booleans are implemented in bytecode as integers, and that logical operators also have different precedence levels. In both cases, the binary expression will be of type boolean. Before returning, we need to deal with the caveat of having applications of lambdas that were declared as parameters of another lambda. Given that there is no parameterization of types in \emph{Scandal}, these lambdas must be applied alone first in an assignment declaration, which is the current inference mechanism for such parameterized types. So we check both expressions to see whether their declaration is a subclass of \il{ParamDeclaration}, and throw an error if that is the case. The very last thing we do while decorating a binary expression is check if our type is still null. If so, all test above have failed. Since we must decorate the expression with a type, an error is thrown whenever type-checking fails.
+
+Generating binary expressions is even more involved, given that operators are \emph{not} overloaded in bytecode at all, hence we need to do all the work. The basic mechanism is to load the left expression, then create a case for each kind of operator. The procedure for all arithmetic operators is very similar. After pushing the left expression, we check if the binary expression has type float. If so, we know at least one of the expressions must have type float. So while the left expression is still on top of the stack, we check if it is \emph{not} a float, and if so call the \il{I2F} instruction. We then push the right expression and do the same check. The last step is to call the appropriate JVM instruction to deal with the float case of the arithmetic operator at hand. If, on the other hand, the binary expression has integer type, then we know \emph{both} expressions also have integer type, so we just push the second expression and call the appropriate JVM instruction. In the cases where we have a logical operator, we observe that the JVM can only perform logical operations on integers, including naturally integer representations of booleans. So here we load the left expression and cast it to integer if it is a float, do the same for the right expression, and call the logical operator's instruction. Comparison operators are more tricky, since we cannot count on the overall type of the binary expression to make necessary conversions, and the JVM does have separate instructions for integers and floats, provided both sides have the same type. Every binary expression whose operator is a comparison has type boolean, but still, JVM instructions are not overloaded, hence we need to have agreeing types on top of the stack before calling a particular instruction. However, observing that after calling the operator instruction, we are always left with an expression of type boolean on top of the stack, we work around testing every possible case by casting both expressions to float, as needed, and only resorting to float comparisons.
+
+Overloading operators can be very beneficial for a DSL. \emph{MATLAB} is perhaps one of the best examples, but also \emph{Csound} operates almost exclusively on overloaded array operations. Expressions that resemble the way we write them mathematically are also fundamental in improving readability, as well as removing the clutter created by words that have a household symbolic representation. The future steps of \emph{Scandal} shall improve even further the functionality of binary expressions. Given the nature of the language's domain, overloaded array operations are the next logical step. As a simple example, one could apply a scalar to an entire array in the same way we write such an expression mathematically. Let $\alpha = 2$ and $\vec{v} = [1 \; 2 \; 3]$. Then $\alpha \cdot \vec{v} = [2 \; 4 \; 6]$. With overloaded array operations, one could write \il{a * [1, 2, 3]} and have it evaluated to \il{[2, 4, 6]}.
+
+\subsubsection{Derived Expressions}
+
+\begin{itemize}
+	\item derivedExpression := parethesizedExpression $|$ unaryExpression $|$ identExpression
+	\item parethesizedExpression := \texttt{LPAREN} expression \texttt{RPAREN}
+	\item unaryExpression := (\texttt{KW\_MINUS} $|$ \texttt{KW\_NOT}) expression
+	\item identExpression := \texttt{IDENT}
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+
+
+% \subsubsection{Literal Expressions}
+
+% Literal expressions are the simplest constructs in the language, and have the following concrete rules:
+
+% \begin{itemize}
+% 	\item literalExpression := intLitExpression $|$ floatLitExpression
+% 	\item literalExpression := boolLitExpression $|$ stringLitExpression
+% 	\item intLitExpression := \texttt{INT\_LIT}
+% 	\item floatLitExpression := \texttt{FLOAT\_LIT}
+% 	\item boolLitExpression := \texttt{KW\_TRUE} $|$ \texttt{KW\_FALSE}
+% 	\item stringLitExpression := \texttt{STRING\_LIT}
+% \end{itemize}
+
+% In the productions above, we note that non-zero integer literals are not allowed to start with a zero. In such a scenario, even though the scanner will create two tokes, one for zero, and another for the rest of the number, since there are no productions in the language that take two integers separated by white space, the parser inevitably will throw a compilation error. The same applies to floating-point decimals, where only one zero can come before the dot. I this particular case, a zero actually \emph{must} precede the \texttt{DOT} token, and such constructs as $x = .5$ are not allowed. Doubles, shorts, or longs do not exist in \emph{Scandal} as of yet, and there is no need to declare float literals the way they are in \emph{Java}, with $1.1f$ for float and $1.1$ for double, say. In fact, that will throw an error. As previously mentioned, string literals are constructed by enclosing text within quotes, and the use of apostrophes will cause a scanning error. Even though quotes are in the language's alphabet, they are never converted into a \il{Token}, as their only possible use is within a string literal. \texttt{DOT}, on the other hand, has uses besides separating the decimal part of a \texttt{FLOAT\_LIT}, namely in composed lambdas. Hence the scanner simply instantiates a token and delegates the inferring of meaning to the parser. Boolean literals are quite self-explanatory, and unlike \emph{C}, numbers are not allowed to replace booleans.
+
+% \subsubsection{Array Expressions}
+
+% \begin{itemize}
+% 	\item arrayExpression := arrayLitExpression $|$ arrayItemExpression
+% 	\item arrayExpression := arraySizeExpression $|$ newArrayExpression
+% 	\item arrayLitExpression := \texttt{LBRACKET} expression (\texttt{COMMA} expression)$^*$ \texttt{RBRACKET}
+% 	\item arrayItemExpression := identExpression \texttt{LBRACKET} expression \texttt{RBRACKET}
+% 	\item arraySizeExpression := \texttt{KW\_SIZE} \texttt{LPAREN} expression \texttt{RPAREN}
+% 	\item newArrayExpression := \texttt{KW\_NEW} \texttt{LPAREN} expression \texttt{RPAREN}
+% \end{itemize}
+
+% \subsubsection{Framework Expressions}
+
+% \begin{itemize}
+% 	\item frameworkExpression := piExpression $|$ cosExpression $|$ powExpression
+% 	\item frameworkExpression := floorExpression $|$ readExpression $|$ recordExpression
+% 	\item piExpression := \texttt{KW\_PI}
+% 	\item cosExpression := \texttt{KW\_COS} \texttt{LPAREN} expression \texttt{RPAREN}
+% 	\item powExpression := \texttt{KW\_POW} \texttt{LPAREN} expression \texttt{RPAREN}
+% 	\item floorExpression := \texttt{KW\_FLOOR} \texttt{LPAREN} expression \texttt{RPAREN}
+% 	\item readExpression := \texttt{KW\_READ} \texttt{LPAREN} expression \texttt{COMMA} expression \texttt{RPAREN}
+% 	\item recordExpression := \texttt{KW\_RECORD} \texttt{LPAREN} expression \texttt{RPAREN}
+% \end{itemize}
+
+% \subsubsection{Lambda Expressions}
+
+% \begin{itemize}
+% 	\item lambdaExpression := lambdaApp $|$ lambdaComp $|$ lambdaLit $|$ lambdaBlock
+% 	\item lambdaApp := identExpression \texttt{LPAREN} expression (\texttt{COMMA} expression)$^*$ \texttt{RPAREN}
+% 	\item lambdaComp := identExpression (\texttt{DOT} identExpression)$^*$
+% 	\item lambdaComp := identExpression (\texttt{DOT} identExpression)$^*$ \texttt{DOT} lambdaApp
+% 	\item lambdaLit := paramDeclaration \texttt{ARROW} (paramDeclaration \texttt{ARROW})$^*$ expression
+% 	\item lambdaBlock := paramDeclaration \texttt{ARROW} (paramDeclaration \texttt{ARROW})$^*$ retBlock
+% 	\item retBlock := \texttt{LBRACE} (assignmentDeclaration $|$ statement)$^*$ retExpression \texttt{RBRACE}
+% 	\item retExpression := \texttt{KW\_RETURN} expression
+% \end{itemize}
