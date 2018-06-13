@@ -296,8 +296,8 @@ Except for assignment statements, whose first token is an identifier, every stat
 	\item Statement := IfStatement $|$ WhileStatement $|$ PrintStatement
 	\item Statement := PlotStatement $|$ PlayStatement $|$ WriteStatement
 	\item ImportStatement := Expression
-	\item AssignmentStatement := \texttt{IDENT} Expression
-	\item IndexedAssignStat := \texttt{IDENT} Expression\_0 Expression\_1
+	\item AssignmentStatement := Token.\texttt{IDENT} Expression
+	\item IndexedAssignStat := Token.\texttt{IDENT} Expression\_0 Expression\_1
 	\item IfStatement := Expression Block
 	\item WhileStatement := Expression Block
 	\item Block := (AssignmentDeclaration $|$ Statement)$^*$
@@ -466,6 +466,8 @@ Overloading operators can be very beneficial for a DSL. \emph{MATLAB} is perhaps
 
 \subsubsection{Derived Expressions}
 
+Derived expressions are those defined in terms of another expression. They exist in three contexts, namely when an expression is surrounded by parenthesis, when we wish to negate a number or logically \emph{or} a boolean expression, and as name references to other expressions. Below are the concrete rules for derived expressions.
+
 \begin{itemize}
 	\item derivedExpression := parethesizedExpression $|$ unaryExpression $|$ identExpression
 	\item parethesizedExpression := \texttt{LPAREN} expression \texttt{RPAREN}
@@ -473,65 +475,105 @@ Overloading operators can be very beneficial for a DSL. \emph{MATLAB} is perhaps
 	\item identExpression := \texttt{IDENT}
 \end{itemize}
 
+Parsing derived expressions takes place in the \il{factor} method, as discussed above. For parenthesized, we simply look for a left parenthesis, consume it, recursively call the \il{expression} method, then consume the right parenthesis. Parenthesized expressions are crucial in order to resolve ambiguities, or force the compiler to construct a binary tree for an expression in a certain way. The expression $(1 + 1) / 2$ will be parsed differently than $1 + 1 / 2$, however the AST has no knowledge of parenthesis, it is the way in which binary expression trees are constructed that determines how they are evaluated. Therefore there are no abstract syntax rules for parenthesized expressions, since what they define is not a subtype, but a specific branching of a binary expression tree. Naturally, this tree may be trivial, in which case the parenthesized expression is reduced to the contents surrounded by parenthesis. Such use of the parenthesized expression rule may have a purpose in improving readability of long mathematical expressions.
 
+Unary expressions are parsed by consuming the operator token, then calling \il{expression} recursively. The \il{UnaryExpression} class extends \il{Node} by adding this referenced expression as a property. The operator is stored as the \il{firstToken} property, inherited from the superclass. Decoration is simple, we ask the expression property to decorate itself, after which we type-check as follows. If we were given a \texttt{MINUS}, and the expression is neither an integer not a float, we throw an error. Else, if we were given a \texttt{NOT}, and the expression is not a boolean, we also throw an error. We note that unary operators are not overloaded in \emph{Scandal}, and only apply to their specific types. Before returning, we decorate the unary expression with the same type as its referenced expression.
 
+Code generation is surprisingly more involved for the boolean case. We start generating by pushing the expression on top of the stack. We then look at the expression type and cover the three cases. If it is an integer, we know from type-checking we were given a \texttt{MINUS}, hence we call the \il{INEG} instruction. For floats, we call the \il{FNEG} instruction. If we were given a boolean expression, than we need to negate it. We do so by creating two labels, visiting an \il{IFEQ} jump instruction, and giving it the first label as an argument, which causes the top of the stack to be popped. If the stack contained a zero, that is, if the expression evaluates to false, then we jump to the first label, where we push a \il{ICONST_1} onto the stack. If the stack contained a true instead, then we push a \il{ICONST_0}, and visit a \il{GOTO} jump, giving it as an argument the second label. At the second label location, we simply do nothing, and just leave the false value on top of the stack.
 
+Identifier expressions by adding a \il{declaration} property, which is naturally a subclass of \il{Declaration}. Parsing is done in the \il{factor} method. Since the \emph{Scandal} grammar for expressions is LL(2), we first rule out all of the cases in which an expression may begin with an \texttt{IDENT} token, and construct an instance of \il{IdentExpression} as the default case. Type-checking is similar to assignment statements in that we check for a name that has already been declared, throwing an error if we find one that has not. We do that by asking the symbol table for the declaration value associated to out identifier, storing it in our \il{declaration} property. The last step is to set out type to be the same as our declaration's.
 
+Generating identifier expressions resorts to three cases. The first case is when the declared variable is a field, which we know from the \il{isField} property every declaration contains. If so, we use \il{mv} to get the value associated with the field's name. The second case deals with the possibility that the variable is a parameter inside a lambda, which happens whenever the \il{declaration} property is an instance of \il{ParamDeclaration}. If so, we can be certain the value of the expression is not a primitive, since the \il{Function} interface requires values to be passed as classes, as discussed previously. We then do two things, use \il{ALOD} to push the expression's value, then call \il{Expression.getTypeValue}, a static method that converts from classes left on top of the stack to their primitive values. Naturally, this only applies to integers, floats, and booleans. If neither a field, nor a parameter, then we load the variable normally. For integers and booleans, we use \il{ILOAD}, for floats \il{FLOAD}, and for all other types we use \il{ALOAD}. Except for fields, we always need a slot number to load variables, which we retrieve from the \il{declaration} property. Below are the abstract syntax rules for all derived expressions.
 
+\begin{itemize}
+	\item DerivedExpression := UnaryExpression $|$ IdentExpression
+	\item UnaryExpression := (Token.\texttt{KW\_MINUS} $|$ Token.\texttt{KW\_NOT}) Expression
+	\item IdentExpression := Token.\texttt{IDENT}
+\end{itemize}
 
+\subsubsection{Literal Expressions}
 
+Literal expressions are the simplest constructs in the language, since their values are not computed. They are naturally leaves in binary expression trees, and are thus parsed in the \il{factor} method. Their concrete rules are very simple, thus instantiating an appropriate AST class simply requires we look for the appropriate token kind. The abstract syntax rules are identical, with an instance of \il{Token} instead of a character string, and are thus omitted. Below are the concrete rules for literal expressions.
 
+\begin{itemize}
+	\item literalExpression := intLitExpression $|$ floatLitExpression
+	\item literalExpression := boolLitExpression $|$ stringLitExpression
+	\item intLitExpression := \texttt{INT\_LIT}
+	\item floatLitExpression := \texttt{FLOAT\_LIT}
+	\item boolLitExpression := \texttt{KW\_TRUE} $|$ \texttt{KW\_FALSE}
+	\item stringLitExpression := \texttt{STRING\_LIT}
+\end{itemize}
 
+In the productions above, we note that non-zero integer literals are not allowed to start with a zero. In such a scenario, even though the scanner will create two tokens, one for the zero, and another for the rest of the number, since there are no productions in the language that take two integers separated by white space, the parser inevitably will throw a compilation error. The same applies to floating-point decimals, where only one zero can come before the dot. In this particular case, a zero actually \emph{must} precede the \texttt{DOT} token, and such constructs as $x = .5$ are not allowed. Doubles, shorts, or longs do not exist in \emph{Scandal} as of yet, and there is no need to declare float literals the way they are in \emph{Java}, with $1.1f$ for float and $1.1$ for double, say. In fact, that will cause an error. As previously mentioned, string literals are constructed by enclosing text within quotes, and the use of apostrophes will cause a scanning error. Even though quotes are in the language's alphabet, they are discarded upon conversion into an instance of \il{Token}, as their only possible use is within a string literal. \texttt{DOT}, on the other hand, has uses besides separating the decimal part of a \texttt{FLOAT\_LIT}, namely in composed lambdas. Hence the scanner simply instantiates a token and delegates the inferring of meaning to the parser, in this case. Boolean literals are quite self-explanatory, and we note booleans are not allowed to replace numbers in arithmetic expressions. As seen in the discussion on binary expressions, arithmetic operators are not overloaded to accept booleans. For all other operators, though, numbers and booleans can be used in the same expression. Also, unlike \emph{C}, numbers alone are not allowed to replace booleans in control statements.
 
+All literal expressions extend \il{Expression} by adding no properties, since all we need is a value that we retrieve from the \il{firstToken} property. In all of them, we override \il{decorate} and do nothing, since all we need to do is decorate the expression with a type, which we always know, so we do that in each class' constructor. Code generation is also easy. For integers and floats, there is a risk the scanner will accept a number that is possibly too long. These cases are handled by the scanner at the earliest stage possible, and an informative error is thrown if a bad number is given. Therefore, we can call respectively \il{Integer.parseInt} and \il{Float.parseFloat} in the code generation phase without any risks, using the result as an argument to \il{mv.visitLdcInsn}, which effectively pushes the value onto the stack. For booleans, we test the given keyword, and load the appropriate constant, whereas for strings we use \il{mv} to load the \il{firstToken.text} property directly.
 
-% \subsubsection{Literal Expressions}
+\subsubsection{Array Expressions}
 
-% Literal expressions are the simplest constructs in the language, and have the following concrete rules:
+Array expressions are fundamental to the DSL in that sound data is processed as arrays of floats. There are four types of array expression, namely literal ones, which are declared as comma-separated numbers surrounded by brackets, array items, which are floats retrieved from an array at a particular index, array sizes, which are integers corresponding to sizes of arrays, and lastly array constructors, which create arrays of zeros with a given integer size. Below are the concrete rules.
 
-% \begin{itemize}
-% 	\item literalExpression := intLitExpression $|$ floatLitExpression
-% 	\item literalExpression := boolLitExpression $|$ stringLitExpression
-% 	\item intLitExpression := \texttt{INT\_LIT}
-% 	\item floatLitExpression := \texttt{FLOAT\_LIT}
-% 	\item boolLitExpression := \texttt{KW\_TRUE} $|$ \texttt{KW\_FALSE}
-% 	\item stringLitExpression := \texttt{STRING\_LIT}
-% \end{itemize}
+\begin{itemize}
+	\item arrayExpression := arrayLitExpression $|$ arrayItemExpression
+	\item arrayExpression := arraySizeExpression $|$ newArrayExpression
+	\item arrayLitExpression := \texttt{LBRACKET} expression (\texttt{COMMA} expression)$^*$ \texttt{RBRACKET}
+	\item arrayItemExpression := identExpression \texttt{LBRACKET} expression \texttt{RBRACKET}
+	\item arraySizeExpression := \texttt{KW\_SIZE} \texttt{LPAREN} expression \texttt{RPAREN}
+	\item newArrayExpression := \texttt{KW\_NEW} \texttt{LPAREN} expression \texttt{RPAREN}
+\end{itemize}
 
-% In the productions above, we note that non-zero integer literals are not allowed to start with a zero. In such a scenario, even though the scanner will create two tokes, one for zero, and another for the rest of the number, since there are no productions in the language that take two integers separated by white space, the parser inevitably will throw a compilation error. The same applies to floating-point decimals, where only one zero can come before the dot. I this particular case, a zero actually \emph{must} precede the \texttt{DOT} token, and such constructs as $x = .5$ are not allowed. Doubles, shorts, or longs do not exist in \emph{Scandal} as of yet, and there is no need to declare float literals the way they are in \emph{Java}, with $1.1f$ for float and $1.1$ for double, say. In fact, that will throw an error. As previously mentioned, string literals are constructed by enclosing text within quotes, and the use of apostrophes will cause a scanning error. Even though quotes are in the language's alphabet, they are never converted into a \il{Token}, as their only possible use is within a string literal. \texttt{DOT}, on the other hand, has uses besides separating the decimal part of a \texttt{FLOAT\_LIT}, namely in composed lambdas. Hence the scanner simply instantiates a token and delegates the inferring of meaning to the parser. Boolean literals are quite self-explanatory, and unlike \emph{C}, numbers are not allowed to replace booleans.
+For all but the \il{arrayItemExpression} rule, array expressions are parsed in the \il{factor} method by looking at their first token. In the case of array item expressions, we have that FOLLOW(\texttt{IDENT}) = $\varepsilon$ $|$ \texttt{LBRACKET} $|$ \texttt{LPAREN} $|$ \texttt{DOT}, hence we need one more token of look-ahead. The cases where we see a left parenthesis correspond to lambda applications, and those in which we see a dot correspond to lambda compositions. After consuming the first token, and possibly the second, parsing follows the same procedure as above, by calling the \il{expression} routine recursively, and abstracting away parenthesis, brackets, commas, and keywords. Instead of storing an \il{IDENT} token, we go ahead and instantiate an \il{IdentExpression} while constructing a \il{ArrayItemExpression}. The reason for that is to simplify decoration and code generation by delegating those tasks to the \il{IdentExpression}, rather than repeating code inside \il{ArrayItemExpression}. It should be immediately apparent that indexed arrays in \emph{Scandal} must have the array necessarily bound to a name, and an expression like $[1, 2, 3][0] == 1$ is not allowed at all. Below are the abstract rules for array expressions.
 
-% \subsubsection{Array Expressions}
+\begin{itemize}
+	\item ArrayExpression := ArrayLitExpression $|$ ArrayItemExpression
+	\item ArrayExpression := ArraySizeExpression $|$ NewArrayExpression
+	\item ArrayLitExpression := (Expression)$^+$
+	\item ArrayItemExpression := IdentExpression Expression
+	\item ArraySizeExpression := Expression
+	\item NewArrayExpression := Expression
+\end{itemize}
 
-% \begin{itemize}
-% 	\item arrayExpression := arrayLitExpression $|$ arrayItemExpression
-% 	\item arrayExpression := arraySizeExpression $|$ newArrayExpression
-% 	\item arrayLitExpression := \texttt{LBRACKET} expression (\texttt{COMMA} expression)$^*$ \texttt{RBRACKET}
-% 	\item arrayItemExpression := identExpression \texttt{LBRACKET} expression \texttt{RBRACKET}
-% 	\item arraySizeExpression := \texttt{KW\_SIZE} \texttt{LPAREN} expression \texttt{RPAREN}
-% 	\item newArrayExpression := \texttt{KW\_NEW} \texttt{LPAREN} expression \texttt{RPAREN}
-% \end{itemize}
+Array literal expressions extend \il{Expression} by adding an \il{ArrayList} of expressions, and naturally overriding its abstract methods. We set the type to \il{Types.ARRAY} in the constructor, similarly to how we handle literal expressions. Inside \il{decorate}, we iterate over the array of expressions, asking them to decorate themselves. For each of them, we check that they have type integer or float, throwing an error otherwise. Not requiring that all entries be floats greatly improves the language, as we can freely mix integers an floats while declaring them as a comma-separated list. Ultimately, though, all values are cast to floats when loading the array. Since we require expressions and not necessarily literal expressions, such an array as \il{[1, pow(2, 3.2), 3.5, pi]} would be perfectly legal. Inside \il{generate}, we construct the array, element by element, on the JVM stack. To do so, we use \il{mv} to push the size of the \il{ArrayList} onto the stack, then call the \il{NEWARRAY} instruction with a \il{T_FLOAT} argument. We then iterate over the \il{ArrayList} and, for each expression, duplicate the top of the stack, push the arrays index onto the stack, ask the expression to generate itself, converting it to float as needed, and finally call the \il{FASTORE} instruction, which stores the expression's value onto the new array at the specified index. At the end of the each iteration, the call to \il{FASTORE} pops the topmost two elements, hence at the end of the entire process, we leave the filled-up array on top of the stack. At the moment, one cannot construct arrays of any type other than arrays of floats. Rather than a design choice, this is another incomplete implementation that shall be revised in the future.
 
-% \subsubsection{Framework Expressions}
+Array item expressions extend \il{Expression} with two properties, namely an identifier expression that references the array, and an expression of type integer that stores the index information. Like with literal expressions, we always know the type here is \il{float}, so we set that accordingly in the constructor. Decoration asks the \il{array} property to decorate itself, then checks if it has type \il{array}, throwing an error if not. We then do the same for the \il{index} property, only we check that it indeed has type integer or float. Generation asks the \il{array} property to push itself onto the stack, then asks the \il{index} property to do the same. If the index has type float, we call the \il{F2I}, as usual. Finally, we use \il{mv} to call \il{FALOAD}, leaving a float on top of the stack.
 
-% \begin{itemize}
-% 	\item frameworkExpression := piExpression $|$ cosExpression $|$ powExpression
-% 	\item frameworkExpression := floorExpression $|$ readExpression $|$ recordExpression
-% 	\item piExpression := \texttt{KW\_PI}
-% 	\item cosExpression := \texttt{KW\_COS} \texttt{LPAREN} expression \texttt{RPAREN}
-% 	\item powExpression := \texttt{KW\_POW} \texttt{LPAREN} expression \texttt{RPAREN}
-% 	\item floorExpression := \texttt{KW\_FLOOR} \texttt{LPAREN} expression \texttt{RPAREN}
-% 	\item readExpression := \texttt{KW\_READ} \texttt{LPAREN} expression \texttt{COMMA} expression \texttt{RPAREN}
-% 	\item recordExpression := \texttt{KW\_RECORD} \texttt{LPAREN} expression \texttt{RPAREN}
-% \end{itemize}
+Array size expressions extend the superclass by including an expression of type \il{array}. Like before, we set the type to integer in the constructor already. Decoration follows the traditional route, asking the \il{array} property to decorate itself, then checking it indeed has type \il{array}. Generation is also easy, asking the \il{array} property to load itself, then using \il{mv} to call the \il{ARRAYLENGTH} instruction. The last type of array expression deals with creating a new array of zeros with a specified length. An instance of \il{NewArrayExpression} extends \il{Expression} by adding to it a \il{size} expression of integer type. Like before, we set the type to \il{array} in the constructor. Decoration follows the usual pattern, asking the \il{size} expression to decorate itself, then checking it is either an integer or a float. Code generation loads the \il{size} on top of the stack, and converts it to integer, as needed, finally calling the \il{NEWARRAY} instruction with a \il{T_FLOAT} argument, similarly to array literal expressions.
 
-% \subsubsection{Lambda Expressions}
+\subsubsection{Framework Expressions}
 
-% \begin{itemize}
-% 	\item lambdaExpression := lambdaApp $|$ lambdaComp $|$ lambdaLit $|$ lambdaBlock
-% 	\item lambdaApp := identExpression \texttt{LPAREN} expression (\texttt{COMMA} expression)$^*$ \texttt{RPAREN}
-% 	\item lambdaComp := identExpression (\texttt{DOT} identExpression)$^*$
-% 	\item lambdaComp := identExpression (\texttt{DOT} identExpression)$^*$ \texttt{DOT} lambdaApp
-% 	\item lambdaLit := paramDeclaration \texttt{ARROW} (paramDeclaration \texttt{ARROW})$^*$ expression
-% 	\item lambdaBlock := paramDeclaration \texttt{ARROW} (paramDeclaration \texttt{ARROW})$^*$ retBlock
-% 	\item retBlock := \texttt{LBRACE} (assignmentDeclaration $|$ statement)$^*$ retExpression \texttt{RBRACE}
-% 	\item retExpression := \texttt{KW\_RETURN} expression
-% \end{itemize}
+Framework expressions, like framework statements, provide functionality to \emph{Scandal} that would be impractical to implement in terms of the language alone. In some cases, though, they are just conveniences, like providing a keyword for the number pi. As discussed previously, this practice always imposes a trade-off, as by not allowing the language to grow in terms of itself, we inevitably experience compiler bloat. Many framework statements and expressions will likely be bootstrapped into the language as it evolves, except perhaps those have a direct correspondence to a JVM instruction, rather than to a \emph{Java} class. The primary difference between framework statements and expressions is that the latter leaves some value on top of the JVM stack to be consumed. Below are the concrete rules for framework expressions.
+
+\begin{itemize}
+	\item frameworkExpression := piExpression $|$ cosExpression $|$ powExpression
+	\item frameworkExpression := floorExpression $|$ readExpression $|$ recordExpression
+	\item piExpression := \texttt{KW\_PI}
+	\item cosExpression := \texttt{KW\_COS} \texttt{LPAREN} expression \texttt{RPAREN}
+	\item powExpression := \texttt{KW\_POW} \texttt{LPAREN} expression \texttt{RPAREN}
+	\item floorExpression := \texttt{KW\_FLOOR} \texttt{LPAREN} expression \texttt{RPAREN}
+	\item readExpression := \texttt{KW\_READ} \texttt{LPAREN} expression \texttt{COMMA} expression \texttt{RPAREN}
+	\item recordExpression := \texttt{KW\_RECORD} \texttt{LPAREN} expression \texttt{RPAREN}
+\end{itemize}
+
+Parsing framework expressions is done in the \il{factor} method by simply looking at the first token and constructing the appropriate subclass of \il{Expression}. In all rules above, we abstract away parenthesis, commas, and keywords. We omit the abstract rules for framework expressions since they follow the usual pattern. The simplest case of them is that of pi expressions. They extend \il{Expression} only by implementing its abstract methods. Like with literal expressions, we set its type to \il{float} right at construction, and decoration therefore does nothing. Code generation simply asks \il{mv} to load \emph{Java}'s \il{Math.PI} on top of the stack.
+
+Cosine expressions are absolutely fundamental to audio signal processing, and are one of the cases where a \il{Scandal} implementation might not be worthwhile. They extend \il{Expression} by adding a \il{phase} property, which is a subclass of \il{Expression} of type \il{float}. Since we always leave a float on top of the stack, we set the type in the constructor. Decoration asks \il{phase} to decorate itself and accepts integers or floats, throwing an error otherwise. Generation asks \il{phase} to leave a value on top of the stack, then converts it to double using either the \il{F2D} or the \il{I2D} instruction, since the method signature for \emph{Java}'s \il{Math.cos} takes a double and returns a double. We then use \il{mv} to invoke \il{Math.cos}, and finally cast the result back to float using \il{D2F}. At the moment, cosine is the only transcendental function built into \emph{Scandal}, since we can compute other trigonometric functions in terms of the cosine. This is, again, not a design choice but a yet incomplete aspect of the language.
+
+Power expressions provide a convenient way to compute exponential expressions, and extend \il{Expression} with two properties, \il{base} and \il{exponent}. Decoration and code generation is follows the same pattern as other framework expressions. The method signature for \il{Math.pow} in \il{Java} takes two doubles and returns one, so we here convert back and forth, like we do with cosine expressions. Both \il{base} and \il{exponent} are overloaded to accept integers and floats, as usual. The syntax for power expression will likely change in the future to that of a caret operator inside a binary expression, which will require one more level of precedence among operators, as discussed previously. Floor expressions are identical to cosine expression, only naturally differing in functionality by invoking \emph{Java}'s \il{Math.floor} method.
+
+Read expressions provide a hook to the audio engine's \il{framework.generators.WaveFile} class, whose main purpose is to parse the contents of a \emph{.wav} file in the file system into an array of floats. \il{ReadExpression} extends the superclass by including two properties, a string \il{path}, and an integer \il{format}, the latter specifying a channel count. We here do not overload the \il{format} property. Decoration follows the usual steps, and code generation asks \il{mv} to create a new instance of \il{WaveFile}, which we duplicate. We then generate the \il{path} property and call \il{init} on \il{WaveFile}. Next, we generate the \il{format} and call \il{WaveFile.get}, which leaves an array of floats on top of the stack.
+
+Record expressions connect the DSL with the audio engine's \il{framework.generators.AudioTask} class. They extend \il{Expression} by adding a \il{duration} property, which has type integer but is overloaded to accept floats, as well. Decoration follows the usual steps, and code generation is very similar to read expressions, where we instantiate \il{AudioTask}, duplicate it, and call \il{init}. We the push the \il{duration}, which is given in milliseconds, onto the stack and cast it to integer, as needed, finally calling \il{AudioTask.record}. The latter will block execution of the \il{Scandal} thread for the entire \il{duration}, capture input from the preferred device in \il{Settings}, the leave an array of floats on top of JVM the stack.
+
+\subsubsection{Lambda Expressions}
+
+In the spirit of saving the best for last,
+
+\begin{itemize}
+	\item lambdaExpression := lambdaApp $|$ lambdaComp $|$ lambdaLit $|$ lambdaBlock
+	\item lambdaApp := identExpression \texttt{LPAREN} expression (\texttt{COMMA} expression)$^*$ \texttt{RPAREN}
+	\item lambdaComp := identExpression (\texttt{DOT} identExpression)$^*$
+	\item lambdaComp := identExpression (\texttt{DOT} identExpression)$^*$ \texttt{DOT} lambdaApp
+	\item lambdaLit := paramDeclaration \texttt{ARROW} (paramDeclaration \texttt{ARROW})$^*$ expression
+	\item lambdaBlock := paramDeclaration \texttt{ARROW} (paramDeclaration \texttt{ARROW})$^*$ retBlock
+	\item retBlock := \texttt{LBRACE} (assignmentDeclaration $|$ statement)$^*$ retExpression \texttt{RBRACE}
+	\item retExpression := \texttt{KW\_RETURN} expression
+\end{itemize}
