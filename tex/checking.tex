@@ -1,0 +1,285 @@
+\chapter{CHECKING TYPES AND DECORATING THE AST}
+
+This chapter presents the type-checking rules for \emph{Scandal} along with the challenges involved in enforcing these rules in the language's \emph{Java} implementation. Although types are static in \emph{Scandal}, many productions are overloaded to accept types that can be easily cast to the required type. Moreover, operators are in their majority overloaded to accept mismatching types, in which case the rules defined in this chapter describe what types should be expected in return. Given that every node in the AST inherits from the \il{Node} abstract base class, type-checking takes place alongside other bookkeeping tasks in every node's \il{decorate} method. This routine is always called on a node by the node's parent. In particular, inside an instance of \il{Program}, type-checking is completely delegated to each node in its node array. More precisely, the \il{decorate} routine iterates over the node array and, for each node, calls \il{node.decorate}, passing along the symbol table instantiated by the compiler. Every direct child node of a program, in turn, delegates decoration of their child nodes, and with very few exceptions, delegation is the default behavior for AST decoration and type-checking.
+
+\section{Decorating Declarations}
+
+Decorating an instance of \il{AssignmentDeclaration} is a bit tricky. There are basically two tasks: checking that the variable is not being re-declared, and checking that the type of the given expression matches the type of the declaration. The declaration's type is set by the constructor of \il{Node} based on its first token. The \il{decorate} routine starts then by checking the top of the stack of symbol tables to see if there is no name clash, then inserts into the symbol table a key of \il{identToken.text} with value \il{this}. The next step is to assign a slot number to this variable, which is done by maintaining a property \il{slotCount} inside \il{SymbolTable}. The \il{slotNumber} property is set to the current slot count, and the latter is increased. A call to \il{expression.decorate} causes the expression to decorate itself and have a non-null type in most cases thereafter, except when the expression is an instance of \il{LambdaAppExpression}, in which case a roadblock in the type-checking process occurs. Listing \ref{alg:infer} provides a small snippet of \emph{Scandal} code to illustrate the situation.
+
+\begin{lstlisting}[emph={lambda,float,return},emphstyle={\textbf},caption={Type inference in \emph{Scandal}.},label={alg:infer}]
+lambda id = float x -> x
+lambda higherOrder = float x -> lambda f -> {
+	float val = f(x)
+	return val
+}
+\end{lstlisting}
+
+When a lambda expression in \emph{Scandal} has a parameter of type \il{lambda}, there is no mechanism in the language to tell what is the parameterized type of that lambda expression. The corresponding construction in \emph{Java} is an instance of the \il{Function} interface, which is a parameterized type. A lambda expression in \emph{Java} that takes a float and returns a float has type \il{Function<Float, Float>}, for example. It has been a design choice so far in \emph{Scandal} not to introduce parameterized types, and attempt instead at some yet crude type inference mechanism. In Listing \ref{alg:infer}, an instance of \il{ParamDeclaration} defines a variable \il{f} of type \il{lambda}. Inside the block, the mechanism of choice to in fact \emph{declare} what parameter types \il{f} has is through an assignment declaration or statement. In line 3, \il{x} is applied to \il{f} and the result stored in \il{val}. Since both \il{x} and \il{val} have type \il{float}, it can be inferred that \il{f} takes a single argument of type \il{float}, and returns also a float. Note that omitting line 3 and putting \il{return f(x)} instead would cause a compilation error, exactly because parameter types of a lambda expression cannot be inferred inside a lambda literal if there is no application thereof.
+
+Given the discussion above, whenever an assignment declaration calls \il{expression.decorate}, and this expression happens to be an application of a lambda declared as a parameter of a lambda literal, instead of expecting the call to \il{expression.decorate} to define a type for the expression, the \il{AssignmentDeclaration} class itself needs to decorate the expression. The process is very simple: after calling \il{expression.decorate}, a check is made to determine if the expression is an instance of \il{LambdaAppExpression}. If so, the declaration of that application's \il{lambda} property is retrieved. If the declaration is an instance of \il{ParamDec}, then the expression at hand must be the application of a lambda declared as a parameter of a lambda literal expression, since parameter declarations only ever exist in the context of lambda literals. The \il{decorate} method then trust the programmer will make use of the lambda literal expression correctly, by applying to it a lambda expression that has the same parameter types as those inferred inside the block. If not, a runtime error will occur. Finally, the \il{expression} property will have to have a type, which is checked against the declaration type. Naturally, in the special case the expression was decorated for being an application of a lambda parameter, this test never fails. If it does, a compilation error is thrown.
+
+\begin{itemize}
+	\item AssignmentDeclaration:
+		\begin{itemize}
+			\item Must not be declared more than once in the same scope
+			\item Type = Expression.type
+		\end{itemize}
+\end{itemize}
+
+Decorating and type-checking field declarations is easier and involves checking all symbol table scopes to see if the variable is not being redeclared. Naturally, there is only ever one scope to check, the zeroth. The variable is then inserted into the symbol table with a key given by \il{identToken.text} and a value of \il{this}. A call to \il{expression.decorate} is made, after which the expression will be decorated with a non-null \il{type}, a property that is common to every node. Unlike \il{LambdaLitDeclaration}, in which the declaration and lambda always have the same type by construction, here a compilation error occurs if the program tries to store, say, a float into an integer field. This is not inherent to the JVM, however, which would in fact accept that a different type be stored in a local variable slot or field. In \emph{Scandal} this is illegal, hence decoration checks whether the expression's type is the same as the declaration's. The latter never needed to be decorated, and was set when the constructor of \il{Node} was called, since it could be inferred from the declaration's first token alone.
+
+\begin{itemize}
+	\item FieldDeclaration:
+		\begin{itemize}
+			\item Must be declared in the outermost scope
+			\item Must not be declared more than once
+			\item Type = Expression.type
+		\end{itemize}
+\end{itemize}
+
+Lambda literal declarations have very different implementations of the \il{Node} abstract methods than those of its superclass \il{AssignmentDeclaration}, hence both \il{decorate} and \il{generate} are overridden. The bodies of these methods are substantially simpler than the superclass' implementation, given the restricted nature of this type. The \il{decorate} routine checks the entire stack of symbol tables to see whether the variable is not being redeclared, in which case an error is thrown. Checking only the topmost scope symbol table would work exactly the same, since lambda literal declarations are only allowed in the outermost scope, hence the stack only contains a single symbol table when the call to \il{decorate} is made. The next step is to insert the identifier into the symbol table, associating to it the instance of \il{LambdaLitDeclaration} at hand. Finally, calling \il{lambda.decorate} delegates decoration of the lambda expression to the \il{LambdaLitExpression} instance. The types of the declaration and expression are always equal to lambda, set in the respective constructors, and hence never need to be checked.
+
+\begin{itemize}
+	\item LambdaLitDeclaration:
+		\begin{itemize}
+			\item Must be declared in the outermost scope
+			\item Must not be declared more than once
+			\item Type = Types.\texttt{LAMBDA}
+		\end{itemize}
+\end{itemize}
+
+When a lambda literal expression is decorated, a new scope in the symbol table is introduced, so that parameter names do not clash with local variables in the \emph{Java} class' \il{run} method. Thus, inside an instance of \il{ParamDeclaration}, the \il{decorate} method checks only the symbol table at the top of the stack of symbol tables to see whether any two parameters have the same identifier, in which case it throws a compilation error. If not, it inserts the identifier into the topmost scope of the symbol table, associating to the identifier the instance of \il{Declaration} at hand. Since parameter declarations are local variables inside a lambda body, they need to have the \il{slotNumber} property set so they can be accessed. This is accomplished, however, by the lambda literal expression class before the \il{decorate} method is called on a parameter declaration, as shall be seen momentarily.
+
+\begin{itemize}
+	\item ParamDeclaration:
+		\begin{itemize}
+			\item Must not be declared more than once
+		\end{itemize}
+\end{itemize}
+
+\section{Decorating Statements}
+
+Decoration of import statements begins by checking that the current scope number in the symbol table is zero, since the linker routine in the compiler only looks for imports in the outermost scope of each pre-compiled program. If not, an error is thrown. Next, a call to \il{expression.decorate} is made and, after the expression has been decorated with a type, a check is performed to see whether that is indeed a string, throwing an exception if not.
+
+\begin{itemize}
+	\item ImportStatement:
+		\begin{itemize}
+			\item Must be stated in the outermost scope
+			\item Expression.type = Types.\texttt{STRING}
+		\end{itemize}
+\end{itemize}
+
+Decorating assignment statements involves looking for a declaration value whose key corresponds to the identifier held in \il{firstToken.text}, starting from the innermost (topmost) scope, and descending to the bottom of the stack of symbol tables, as needed. Contrary to assignment declarations, if \emph{no} declaration is found, an error is thrown. Decoration of the \il{expression} property is delegated to the corresponding subclass of \il{Expression}, as usual. The exact same caveat with type inference in instances of \il{LambdaAppExpression} applies here, so a check is made to determine whether the given expression is a lambda application of a lambda parameter inside a return block. If so, the \il{AssignmentStatement} class decorates the lambda application expression with its declaration's type. All that is left is to check if the type of the declaration corresponds to the type of the expression, and an error is thrown if there is a mismatch.
+
+\begin{itemize}
+	\item AssignmentStatement:
+		\begin{itemize}
+			\item Must have been declared in some enclosing scope
+			\item Declaration.Type = Expression.type
+		\end{itemize}
+\end{itemize}
+
+Decoration of an indexed assignment statement is similar to the superclass in it checks the symbol table to see whether the identifier has been declared, throwing an error if not. In addition, a check must be made to determine if the declaration associated with the identifier has indeed type \il{array}, otherwise an error is also thrown. Decoration of the \il{index} property is delegated to the appropriate subclass of \il{Expression}, as usual. Contrary to most descendants of \emph{C}, however, \emph{Scandal} does allow arrays to be indexed by expressions of type \il{float}, in which case the integer part of the number is taken in the generation phase. Thus while checking the type of \il{index}, an error is thrown if is neither an integer nor a float. The \il{expression} property is decorated in a similar way, however here too care must be taken with higher-order functions. A check for those is performed exactly the same way it is in the superclass, decorating the \il{expression} property as needed. When decorating a lambda application inside a lambda block, the expression's type is naturally always set to \il{Types.FLOAT}. Similarly to the \il{index} property, the \il{expression} property is overloaded to accept integers, and in that case a conversion to float is performed in the generation phase before storing the expression's value.
+
+\begin{itemize}
+	\item IndexedAssignmentStatement:
+		\begin{itemize}
+			\item Must have been declared in some enclosing scope
+			\item Declaration.Type = Types.\texttt{ARRAY}
+			\item Expression\_0.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Expression\_1.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+		\end{itemize}
+\end{itemize}
+
+Decorating if and while-statements is identical. The \il{expression} property is asked to decorate itself, then checked to see whether it is of type boolean, an error being throw otherwise. After that, the block is asked to decorate itself. Decorating a block involves introducing a new scope by calling \il{symtab.enterScope}, asking each node in the block's \il{nodes} array to decorate itself, then calling \il{symtab.leaveScope}. Import statements are disallowed in blocks, since the compiler only ever looks for those in the zeroth scope, and so are lambda literals and fields. If a global variable declaration or an import statement is given to a block, neither the parser nor the block will take notice of it. The error will be thrown by the respective AST nodes upon decoration, when the node itself asks the symbol table for its current scope number, throwing an error if the latter is not zero.
+
+\begin{itemize}
+	\item IfStatement:
+		\begin{itemize}
+			\item Expression.type = Types.\texttt{BOOL}
+		\end{itemize}
+	\item WhileStatement:
+		\begin{itemize}
+			\item Expression.type = Types.\texttt{BOOL}
+		\end{itemize}
+\end{itemize}
+
+Framework statements are all decorated in a similar fashion by delegating decoration to each parameter, then checking types. Decoration of a print statement asks the expression to decorate itself, after which a check is performed to determine if the expression's type is either \il{array} or \il{lambda}. In both cases an error is thrown. Decoration of a plot statement is accomplished simply by asking each expression to decorate itself, then type-checking the first to be a string, the second to be an array, and overloading the third to accept integers and floats. Decoration of play statements follows the same pattern, and requires that the first expression be an array, and the second be an integer. The same pattern applies to write statements, which require that the three expressions be of type array, string, and integer, respectively.
+
+\begin{itemize}
+	\item PrintStatement:
+		\begin{itemize}
+			\item Expression.type != Types.\texttt{ARRAY} $|$ Types.\texttt{LAMBDA}
+		\end{itemize}
+	\item PlotStatement:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{STRING}
+			\item Expression\_1.type = Types.\texttt{ARRAY}
+			\item Expression\_2.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+		\end{itemize}
+	\item PlayStatement:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{ARRAY}
+			\item Expression\_1.type = Types.\texttt{INT}
+		\end{itemize}
+	\item WriteStatement:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{ARRAY}
+			\item Expression\_1.type = Types.\texttt{STRING}
+			\item Expression\_2.type = Types.\texttt{INT}
+		\end{itemize}
+\end{itemize}
+
+\section{Decorating Expressions}
+
+Decorating and generating binary expressions is somewhat involved, mostly due to the great variety of operators and their supported types. In addition, operators in \emph{Scandal} are overloaded to a certain extent, as to provide type polymorphism in binary expressions, which adds to the number of cases that must be considered while decorating and generating expressions, but also make the DSL more concise and readable. Decorating a binary expression begins with asking both expressions to decorate themselves, after which their types will be non-null. Given the binary-tree nature of these expressions, this is accomplished recursively, hence \il{decorate} may be calling on itself if one of the sub-expressions is a binary expression. For this reason, \il{decorate} needs to have a type before returning. In fact, almost all that is done inside \il{decorate} is to go over the different combinations of operators and expression types to determine what the overall type of the binary expression is. If given two expressions in any combination of integers or floats, arithmetic can be performed on those numbers. Note that arithmetic operators do not always have the same precedence amongst themselves. There are two sub-cases. If both expressions are of type integer, then the resulting binary expression is decorated with an integer type. Otherwise, if at least one of the expressions has type float, the whole binary expression will have type float. If instead any combination of integers, floats, or booleans is given, then logical or comparison operators can be used, remembering that booleans are implemented in bytecode as integers, and that logical operators also have different precedence levels. In both cases, the binary expression will be of type boolean. Before returning, the caveat of having applications of lambdas that were declared as parameters of another lambda must be considered. Given that there is no parameterization of types in \emph{Scandal}, these lambdas must be applied alone first in an assignment declaration or statement, which is the current inference mechanism for such parameterized types. So a check is performed on both expressions to see whether any of their declarations is a subclass of \il{ParamDeclaration}, and an error is thrown if that is the case. The very last thing we do while decorating a binary expression is to check if the binary expression's type is still null. If so, all tests above have failed. Since the binary expression must be decorated with a type, as mentioned above, an error is thrown whenever all type-checking cases fail.
+
+\begin{itemize}
+	\item BinaryExpression:
+		\begin{itemize}
+			\item ArithmeticOp := \texttt{MOD} $|$ \texttt{PLUS} $|$ \texttt{MINUS} $|$ \texttt{TIMES} $|$ \texttt{DIV}
+			\item (\texttt{INT} $|$ \texttt{FLOAT}) ArithmeticOp (\texttt{INT} $|$ \texttt{FLOAT}) $\to$ \texttt{FLOAT}
+			\item \texttt{INT} ArithmeticOp \texttt{INT} $\to$ \texttt{INT}
+			\item ComparisonOp := \texttt{AND} $|$ \texttt{OR} $|$ \texttt{EQUAL} $|$ \texttt{NOTEQUAL} $|$ \texttt{LT} $|$ \texttt{LE} $|$ \texttt{GT} $|$ \texttt{GE}
+			\item (\texttt{INT} $|$ \texttt{FLOAT} $|$ \texttt{BOOL}) ComparisonOp (\texttt{INT} $|$ \texttt{FLOAT} $|$ \texttt{BOOL}) $\to$ \texttt{BOOL}
+		\end{itemize}
+\end{itemize}
+
+Decoration of unary expressions is simple, following the usual path of asking the expression property to decorate itself, after which type-checking proceeds as follows. If given a \texttt{MINUS}, and the expression is neither an integer not a float, an error is thrown. Else, if given a \texttt{NOT}, and the expression is not a boolean, an error is also thrown. Note that unary operators are not overloaded in \emph{Scandal}, and only apply to their specific types. Before returning, the unary expression is naturally decorated with the same type as the given expression. Type-checking identifier expressions is similar to assignment statements in that a check for a name that has already been declared is made, and an error is thrown if it has not. That is done by asking the symbol table for the declaration value associated to the given identifier key, after which the declaration is stored in the \il{declaration} property. The last step is to set the expression's type to be the same as the declaration's.
+
+\begin{itemize}
+	\item UnaryExpression:
+		\begin{itemize}
+			\item Token.\texttt{MINUS} Types.\texttt{INT} $\to$ Types.\texttt{INT}
+			\item Token.\texttt{MINUS} Types.\texttt{FLOAT} $\to$ Types.\texttt{FLOAT}
+			\item Token.\texttt{NOT} Types.\texttt{BOOL} $\to$ Types.\texttt{BOOL}
+		\end{itemize}
+	\item IdentExpression:
+		\begin{itemize}
+			\item Variable must have been declared in some enclosing scope
+			\item Type = Declaration.type
+		\end{itemize}
+\end{itemize}
+
+Decorating literal expressions is trivial. In all of them, \il{decorate} is overridden for being abstract, but nothing is done there, since all that is needed is to decorate the expression with a type, which is always known, hence done in each class' constructor.
+
+\begin{itemize}
+	\item IntLitExpression:
+		\begin{itemize}
+			\item Type = Types.\texttt{INT}
+		\end{itemize}
+	\item FloatLitExpression:
+		\begin{itemize}
+			\item Type = Types.\texttt{FLOAT}
+		\end{itemize}
+	\item BoolLitExpression:
+		\begin{itemize}
+			\item Type = Types.\texttt{BOOL}
+		\end{itemize}
+	\item StringLitExpression:
+		\begin{itemize}
+			\item Type = Types.\texttt{STRING}
+		\end{itemize}
+\end{itemize}
+
+Decoration of array expressions follows the usual route. In all of them, the expression type is always known, hence set in the constructor. For array literal expressions, the \il{decorate} method iterates over the array of expressions, asking them to decorate themselves. For each of them, a check is made to determine that they have type integer or float, throwing an error otherwise. Ultimately, though, all values are cast to float when creating the array. Decoration of array item expressions asks the \il{array} property to decorate itself, then checks if it has type array, throwing an error if not. The same is done for the \il{index} property, only checking that it indeed has type integer or float. For array size expressions, decoration is done only by asking the \il{array} property to decorate itself, then checking it indeed has type \il{array}. For new array expressions, \il{decorate} asks the \il{size} expression to decorate itself, then checks it is either an integer or a float.
+
+\begin{itemize}
+	\item ArrayLitExpression:
+		\begin{itemize}
+			\item (Expression)$^+$.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Type = Types.\texttt{ARRAY}
+		\end{itemize}
+	\item ArrayItemExpression:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{ARRAY}
+			\item Expression\_1.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Type = Types.\texttt{FLOAT}
+		\end{itemize}
+	\item ArraySizeExpression:
+		\begin{itemize}
+			\item Expression.type = Types.\texttt{ARRAY}
+			\item Type = Types.\texttt{INT}
+		\end{itemize}
+	\item NewArrayExpression:
+		\begin{itemize}
+			\item Expression.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Type = Types.\texttt{ARRAY}
+		\end{itemize}
+\end{itemize}
+
+Framework expressions are also easily decorated, and type-checking arguments follows the usual pattern. For pi expressions, nothing is done inside \il{decorate}. Cosine expressions overload the \il{phase} property to accept integers and floats. In power expressions, both \il{base} and \il{exponent} properties are overloaded to accept integers and floats. Read expressions take a \il{format} argument that is of type integer and is not overloaded, similarly to play statements, which also have an integer-only property describing the channel count. Record expressions, on the other hand, do overload the \il{duration} property to accept integers as well as floats.
+
+\begin{itemize}
+	\item PiExpression:
+		\begin{itemize}
+			\item Type = Types.\texttt{FLOAT}
+		\end{itemize}
+	\item CosExpression:
+		\begin{itemize}
+			\item Expression.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Type = Types.\texttt{FLOAT}
+		\end{itemize}
+	\item PowExpression:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Expression\_1.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Type = Types.\texttt{FLOAT}
+		\end{itemize}
+	\item FloorExpression:
+		\begin{itemize}
+			\item Expression.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Type = Types.\texttt{FLOAT}
+		\end{itemize}
+	\item ReadExpression:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{STRING}
+			\item Expression\_1.type = Types.\texttt{INT}
+			\item Type = Types.\texttt{ARRAY}
+		\end{itemize}
+	\item RecordExpression:
+		\begin{itemize}
+			\item Expression.type = Types.\texttt{INT} $|$ Types.\texttt{FLOAT}
+			\item Type = Types.\texttt{ARRAY}
+		\end{itemize}
+\end{itemize}
+
+\section{Decorating Lambdas}
+
+Decorating lambda literal expressions is not too complicated. Because new local variables are introduced with a lambda literal expression's list of parameters, decoration begins by pushing a new scope onto the symbol table stack. This allows names to be declared such that they will not clash with names already in the zeroth scope, however does not protect the lambda literal expression from \emph{seeing} the zeroth scope. Given that names in the bottom scope are local variables in the context of the \emph{Java} class' \il{run} method, and lambda bodies are scoped in an altogether different method within the same \emph{Java} class, any name declared in the zeroth scope is actually invisible to the lambda body. Of course, unless these names were declared as fields. After introducing a new scope, \il{decorate} iterates over the parameter list, assigning to each parameter a slot number, and asking each parameter to decorate itself. The parameter slot numbers are needed for local variables and are assigned sequentially from zero to the size of the list minus one. After that, the return expression is asked to decorate itself, and the symbol table is asked to leave the previously introduced scope. Finally, the \il{lambdaSlot} property is set to be equal to the symbol table's \il{lambdaCount} property, and the latter is incremented by the size of the parameter list. The reason for assigning a lambda number to each lambda literal is because lambda expressions are accessed by name in bytecode, and the naming convention is the word \emph{lambda} followed by a number. In addition, the \il{Function} interface naturally curries the parameters in a lambda expression and, per \emph{Scandal}'s design choice, parameters in a lambda have a traditional right-associative currying. This means there is a method body that responds to all parameters, another that responds to all but the first, and so on until the last method body that responds only to the very last, rightmost parameter. Therefore the leftmost body is associated to the \il{lambdaCount} slot, the one to its right is associated to the \il{lambdaCount}$ + 1$ slot, and the rightmost body is associated to the \il{lambdaCount} $+$ \il{params.size}$ - 1$ slot. In effect, that is exactly how these curried methods are accessed as partial applications, separately.
+
+Decorating lambda literals with blocks is similar, but a bit more complicated than decorating lambda literals with expressions. As before, a new scope is introduced and \il{decorate} iterates over the parameter list, assigning parameters slot numbers and asking them to decorate themselves. Before asking the block to decorate itself, however, the fact that the block may contain declarations must be considered. Since declarations inside a return block are local variables to a method, they need slot numbers. The symbol table passed along has a running slot count for variables that are local to the \il{run} method, however, hence a temporary change to this value is needed. Every local variable inside the lambda block is assigned an incremental slot number that is offset by the number of arguments given in a lambda application. If, for example, a lambda has three parameters and three local variables, the parameters will have slot numbers ranging from zero to two, and the local variables will have slot numbers ranging from three to five. So the current slot count is stored in a local variable, changed to the size of the parameter list, the block is decorated, and finally the running slot count in the symbol table is set back to its previous state, using the value previously stored. After that, the topmost scope is popped, and the lambda count is increased in the symbol table by the size of the parameter list, similarly to lambda literals with expressions. Decoration of return blocks differ from the \il{Block} superclass in that they do not introduce a new scope, since that task is accomplished by the lambda literal that contains the return block. It also differs in that the return expression is asked to decorate itself.
+
+Decorating a lambda application is not at all straightforward. The main complication is finding the declaration of a lambda literal that contains the body of the method to which the lambda application's list of arguments should be applied. In other words, the name reference held by the \il{lambda} property may not necessarily point to the declaration of a lambda literal, in which case a whole chain of name references needs to be unraveled until a declaration whose expression actually contains a method body is found. Decoration begins by asking \il{lambda}, which is an identifier expression, to decorate itself, after which it will be decorated with a declaration. A check is made to determine if the declaration is a parameter declaration, in which case decoration can go no further, since this is an application of a lambda that is a parameter of another lambda. In this case, the type of the application expression, as well as the parameterized type of its declaration, is inferred and set by an assignment declaration or statement, as discussed previously. All that is left to do then is to iterate over the parameter list, asking for each parameter to decorate itself, and return.
+
+If the \il{lambda} declaration is not a parameter declaration, it might still not point to the declaration of a lambda literal, but at least it can be determined that it either lives inside \il{run}, or is a field. Decoration then traverses the AST from the application node backwards to its ancestors until a lambda literal is reached. There are basically three cases. In the first, the declaration of \il{lambda} points to an identifier expression. This case happens whenever a lambda expression is copied locally to a variable. The declaration then is set to point to the declaration of \emph{that} identifier expression, and traversal keeps looking, moving onto the previous ancestor. In the second case, the declaration points to a lambda composition. A lambda composition holds an entire list of identifier expressions, all of which may or may not point to the declaration of a lambda literal. In this case, there may be many parents to a node, but the very last is picked. Whatever lambda literal to which it ultimately points, must have a parameter list that matches this application's argument list, which is exactly what is needed in order to decorate this lambda application. If neither an identifier nor a composition, then the declaration must be pointing to another application. In this case, it cannot be known yet whether this application is a partial application, but it can be known for sure that the application to which the declaration points indeed is a partial application, for if it were total, this application could not exist, as there would be no more parameters to be fixed. But given this situation, it can be inferred that this application's argument list must be smaller that the parameter list of the lambda literal sought, since some partial application already fixed some of its parameters, and this application is a step further down the chain. Decoration then iterates over the argument list of the application to which the declaration points from right to left, that is, from its last down to its first element, and prepends to this application's list of arguments any of those arguments that its list does not yet contain. A sanity check is then performed to determine if some of these arguments have not already been added.
+
+After traversing the AST without errors, the declaration pointer is guaranteed to have arrived at the declaration of a lambda literal, hence the latter's expression is stored in the \il{lambdaLit} property for further use during generation. Only at this point does decoration of the argument list actually begin. The \il{decorate} method iterates over the argument list, however the original argument list might have grown in the traversal process. That is why the size of the original list was stored in the \il{count} property, so \il{decorate} will restrict to \emph{only} the parameters that were originally in the list. That is accomplished by offsetting the iterator by the current argument list size minus its original size, which represents exactly the number of parameters that might have been added during traversal. By prepending arguments to the argument list, the latter now has been made the exact same size as the parameter list in \il{lambdaLit}, but there is no actual need to decorate arguments that were not meant for this particular application, hence why the list is offset. Moreover, the index of each original argument in the argument list now aligns properly with the corresponding parameters in the \il{lambdaLit} parameter list. Decoration then goes over the original parameters asking them to decorate themselves and checking that their types are the same as the types of the corresponding parameters in \il{lambdaLit}. Finally, a check is made to see if the type of this lambda application expression is indeed \il{lambda}. That is done by checking whether the current count of the argument list is the same as the parameter count in \il{lambdaLit}. If so, then the application has fixed all the parameters in \il{lambdaLit}, hence the type of the lambda application is set to the type of the \il{lambdaLit}'s return expression. If there are less arguments than \il{lambdaLit} has parameters, then this is a partial application, hence the current type definition is kept.
+
+Decorating a lambda composition consists at the moment of just asking each composed lambda to decorate itself, then checking whether the \il{lambdaApp} property is null and, if not, asking it to decorate itself. The lambda application will in turn decorate its parameters and check that input types are correct. The last step is to set the type of the entire composition expression to the return type of its \il{lambdaApp}, if the latter is not null. This is an incomplete implementation, and the reasons for that shall be addressed in the following chapters.
+
+\begin{itemize}
+	\item LambdaLitExpression:
+		\begin{itemize}
+			\item Type = Types.\texttt{LAMBDA}
+		\end{itemize}
+	\item LambdaLitBlock:
+		\begin{itemize}
+			\item Type = Types.\texttt{LAMBDA}
+		\end{itemize}
+	\item LambdaAppExpression:
+		\begin{itemize}
+			\item Expression\_0.type = Types.\texttt{LAMBDA}
+			\item The type of each argument must match the type of the corresponding parameter in the original lambda literal
+			\item Type = Types.\texttt{LAMBDA} if the number of arguments given is less than the total number of parameters
+			\item Type = the original lambda's return type if the number of arguments matches the total number of parameters
+		\end{itemize}
+	\item LambdaCompExpression:
+		\begin{itemize}
+			\item (Expression)$^+$.type = Types.\texttt{LAMBDA}
+			\item The return type of each expression must match the input type of the next
+			\item Argument types must match the first expression's input types
+			\item Type = Types.\texttt{LAMBDA} if no arguments are given
+			\item Type = the return type of the last expression if arguments are given
+		\end{itemize}
+\end{itemize}

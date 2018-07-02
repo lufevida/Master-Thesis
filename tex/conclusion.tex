@@ -1,0 +1,254 @@
+\chapter{CASE STUDIES AND CONCLUSION}
+
+In this chapter, a variety of audio signal processing and music composition applications of \emph{Scandal} is presented. These are meant as illustrations of how the language can be used, but also to show how it can differ from other languages whose domains are specific to audio signal processing and music. The chapter is concluded with a discussion of all roadblocks so far, and possible directions for the future development of \emph{Scandal}.
+
+%Comparisons are made with \emph{Csound}, \il{Max}, and \il{Supercollider}, which represent the \emph{de-facto} standards in the field. Occasionally, some uses of \il{Scandal} are contrasted with \il{Java} itself, mainly to picture how exactly \emph{Scandal} departures from its underlying paradigm, as well as how restricting to a specific domain can afford a much streamlined syntax.
+
+\section{Breakpoint Functions}
+
+Generating breakpoint functions is absolutely fundamental to musical applications. A primary use is to create fade-ins and outs to avoid undesirable clicks, as well as cross-fades of overlapping buffers to smoothen transitions. One interesting way to build breakpoint functions is \emph{Csound}'s \il{GEN7} routine. Its straightforward syntax is illustrated in Listing \ref{alg:gen7}.
+
+\begin{lstlisting}[emph={instr,endin,phasor,tablei,oscil,out,f,i},emphstyle={\textbf},caption={Enveloping an audio buffer in \emph{Csound} with \il{GEN7}.},label={alg:gen7}]
+<CsoundSynthesizer>
+	<CsInstruments>
+		0dbfs = 1
+		instr 1
+			kIndex phasor 1 / p3
+			kEnvelope tablei kIndex, 1, 1
+			aSine oscil .5 * kEnvelope, 1220
+			out aSine
+		endin
+	</CsInstruments>
+	<CsScore>
+		f 1 0 1024 7 0 512 1 512 0
+		i 1 0 2
+	</CsScore>
+</CsoundSynthesizer>
+\end{lstlisting}
+
+\begin{enumerate}
+	\addtocounter{enumi}{2}
+	\item Line 3 sets the overall amplitude to range from zero to one, since the default behavior in \emph{Csound} is to have amplitudes range from zero to 32768, the 32-bit word length.
+	\item Lines 4 to 9 form the instrument 1 block.
+	\item The \il{phasor} opcode is used to generate indices, and is given an argument of \il{1 / p3}, that is, it is being asked to provide indices ranging from zero to one over the duration \il{p3}, which is the third argument given to \il{instr 1} in the \il{CsScore} section.
+	\item The \il{tablei} opcode reads from a table indexed by \il{kIndex}, and is given as other arguments the table number (1), and a normalization factor (1).
+	\item The \il{oscil} opcode produces a sine wave with $.5 * $ \il{kEnvelope} amplitude, and a 1220 Hz frequency of oscillation.
+	\item The \il{out} opcode outputs \il{aSine} to the speakers.
+	\addtocounter{enumi}{2}
+	\item Function table 1 is instantiated at time 0, has size 1024, is computed by the \il{GEN7} routine, and its values range from 0 to 1 over 512 samples, and from 1 to 0 over 512 samples.
+	\item Instrument 1 starts playing at time 0 and plays for 2 seconds.
+\end{enumerate}
+
+Even thought quite verbose, the \emph{Csound} code in Listing \ref{alg:gen7} accomplishes a lot behind the scenes. It is interesting to observe, however, that the implementation hiding in the opcode methods does not release the musician from writing structured text, and in many cases actually blinds the user to implementations that are in fact very easy. Any one willing to learn \emph{Csound} would likely have but little trouble learning how to implement \il{GEN7}, but would have immense gains in learning how to do so. Moreover, simple implementations like \il{GEN7} are problematic from the standpoint of the language designer too, since maintaining literally over a thousand opcodes is extremely burdening in all aspects of a compiler's development ecosystem. These observations lie at the core of \emph{Scandal}'s philosophy. Listing \ref{alg:gen7scandal} demonstrates the implementation of \il{GEN7} in \emph{Scandal}. Its use is as similar as possible to that of \emph{Csound}: the first argument provides a length, and the the second argument is an array that provides a variable number of breakpoints and their lengths. Line 12 of Listing \ref{alg:gen7} would be declared in \il{Scandal} as \il{array f1 = GEN7(1024, [0, 512, 1, 512, 0])}.
+
+\begin{lstlisting}[emph={lambda,array,int,float,new,while,size,if,return},emphstyle={\textbf},caption={A \emph{Scandal} implementation of \il{GEN7}.},label={alg:gen7scandal}]
+lambda GEN7 = int length -> array args -> {
+	array table = new(length)
+	float height = 0.0
+	float increment = 0.0
+	int width = 0
+	int i = 0
+	int j = 0
+	while j < size(args) - 2 {
+		height = args[j]
+		increment = (args[j + 2] - args[j]) / args[j + 1]
+		width = i + args[j + 1]
+		while i < width {
+			if i < length { table[i] = height }
+			height = height + increment
+			i = i + 1
+		}
+		j = j + 2
+	}
+	return table
+}
+\end{lstlisting}
+
+The algorithm in Listing \ref{alg:gen7scandal} is quite self-explanatory. Of course, the user may always \emph{choose} to hide its implementation by putting it in a separate file and using an import statement. Creating a fade-out, for example, becomes the simple task illustrated in Listing \ref{alg:fadeout}. A fade-in method, as well as a cross-fade method that relies on both a fade-in and a fade-out are may be found in the \emph{lib/Fades.scandal} file, which is bundled with the IDE. Naturally, these routines can be re-factored to accept any other enveloping function other than \il{GEN7} by simply making them into higher-order functions, and setting the enveloping routine as a parameter. This type of re-factoring shows both the musical creative potential and software re-usability associated to functional programming, corroborating \emph{Scandal}'s choice of paradigm. A \emph{Scandal} implementation of Listing \ref{alg:gen7} will be given at the end of the next section, after covering more ground.
+
+\begin{lstlisting}[emph={lambda,array,int,new,while,size,if,return},emphstyle={\textbf},caption={Implementation of a fade-out effect.},label={alg:fadeout}]
+lambda fadeOut = array x -> int samples -> {
+	array fade = GEN7([samples, 1, 0, samples])
+	array buffer = new(size(x))
+	int i = 0
+	int j = 0
+	while i < size(x) {
+		buffer[i] = x[i]
+		if i >= size(x) - samples {
+			buffer[i] = buffer[i] * fade[j]
+			j = j + 1
+		}
+		i = i + 1
+	}
+	return buffer
+}
+\end{lstlisting}
+
+\section{Oscillators}
+
+This section discusses \emph{Scandal} methods intended to synthesize sound. Results are again compared with similar \emph{Csound} routines, but also with an object-oriented way of accomplishing the same task. Given the ubiquity of the OOP paradigm, and the fact that \emph{Scandal}'s underlying foundation is object-oriented, a decision of making \emph{Scandal} a simple scripting language with a functional flavor was made in order to facilitate restricting its domain. It is the language's philosophy to remain focused, with a clear intent to abstract away some of \emph{Java}'s more verbose syntax. There are many obvious sacrifices involved with this restriction, especially when it comes to handling user-defined types and data structures. A foreseeable roadblock is that of frequency-domain signal processing, which involves complex numbers, and arrays thereof, and whose implementation would require \emph{Scandal} to step up from its naivety. That said, the functional paradigm is capable of handling elegantly and concisely most of the implementation challenges involved in audio signal processing. An OOP way of defining an oscillator would involve defining a general waveform type, then sub-classing it into specific waveforms. Common to every waveform would be a routine that returned a sample value, given a phase argument in radians. An oscillator class would then hold the phase value as a property, as well as a pointer to a waveform generator. It is easy to see how such a design translates into the functional paradigm. Instead of subclasses of a parent class that override a certain method, a function itself defines a method to compute a waveform, given a phase argument. And instead of an object, an oscillator is a higher-order function which takes a specific waveform-producing function as an argument. Listing \ref{alg:oscillator} illustrates how an oscillator may be defined in \emph{Scandal}.
+
+\begin{lstlisting}[emph={lambda,float,int,array,new,pi,while,if,return},emphstyle={\textbf},caption={Defining an oscillator.},label={alg:oscillator}]
+lambda oscillator = float dur -> float amp -> float freq -> lambda shape -> {
+	array buffer = new(dur * 44100)
+	float phase = 0.0
+	int i = 0
+	while i < dur * 44100 {
+		buffer[i] = shape(phase)
+		buffer[i] = buffer[i] * amp
+		phase = phase + freq * 2 * pi / 44100
+		if phase >= 2 * pi { phase = phase - 2 * pi }
+		i = i + 1
+	}
+	return buffer
+}
+\end{lstlisting}
+
+Listing \ref{alg:oscillator} creates a buffer of audio samples containing a waveform specified by the function \il{shape}. It is important to observe that the parameter \il{shape} has its own parameters and return types inferred, hence needs to be applied in line 9 before used in the binary expression of line 10. In order to make use of \il{oscillator}, all that is needed is some function that returns a waveform given a phase in radians. The cosine function comes to mind as the most straightforward, but in fact any waveform is easy to implement. Listing \ref{alg:waveforms} provides a few examples. In particular, line 1 is just a wrapping around the built-in \il{cos} expression, meant to work with \il{oscillator}.
+
+\begin{lstlisting}[emph={lambda,float,cos,pi,if,return},emphstyle={\textbf},caption={Waveform-generating lambdas.},label={alg:waveforms}]
+lambda cosine = float phase -> cos(phase)
+lambda sawtooth = float phase -> 2 * (1 - phase / (2 * pi)) - 1
+
+lambda square = float phase -> {
+	float val = 1.0
+	if phase >= pi { val = -1.0 }
+	return val
+}
+
+lambda triangle = float phase -> {
+	float val = 1 - phase / pi
+	if val < 0.0 { val = -val }
+	return 2 * val - 1
+}
+\end{lstlisting}
+
+Putting all the above together, this section concludes with a \emph{Scandal} implementation of Listing \ref{alg:gen7}. What the \emph{Csound} program basically does is modulate the amplitude of the \il{aSine} by \il{kEnvelope}. Instead of using a phasor to get indices, \emph{Scandal}'s \il{instr1} simply combines both arrays using a while loop. Of course, a phasor lambda could equivalently be defined, or even any lambda that took two arrays of different sizes and computed their point-wise product, which is exactly what applying an envelope does. In line 6 of Listing \ref{alg:mod}, the envelope array is indexed in terms of the size of the waveform array. The simple statement \il{play(instr1(2.0, GEN7(1024, [0, 512, 1, 512, 0])), 1)} causes the \emph{Scandal} program to have the same sound output as the \emph{Csound} program.
+
+\begin{lstlisting}[emph={lambda,float,array,int,while,return},emphstyle={\textbf},caption={Implementing a \emph{Csound} program in \emph{Scandal}.},label={alg:mod}]
+lambda instr1 = float dur -> array kEnvelope -> {
+	int samples = dur * 44100
+	array aSine = oscillator(dur, 1.0, 1220.0, cosine)
+	int kIndex = 0
+	while i < samples {
+		aSine[i] = aSine[i] * kEnvelope[kIndex * size(kEnvelope) / samples]
+		kIndex = kIndex + 1
+	}
+	return aSine
+}
+\end{lstlisting}
+
+\section{Composing Music With Loops}
+
+This section demonstrates how an entire musical composition may be coded in \emph{Scandal}. The technique of choice is that of composing with audio loops, a common technique in the music industry, particularly with DJ's. An audio loop is a pre-composed snippet of music containing properties, namely style, beats-per-minute, number of bars, and harmonic key, if applicable. Loops are usually single-instrument recordings, and composing with them often involves orchestrating these instruments. Most loops are rather short, and a common technique is to \emph{stretch} them. One stretches a loop by, as the name suggests, repeating them as desired. Since loops are cut to encompass a certain number of bars \emhp{exactly}, the next repetition will always be rhythmically synchronized with the previous. By orchestrating loops with the same BPM, the entire composition becomes easily synchronized, as well. Listing \ref{alg:stretch} gives a \emph{Scandal} implementation of a simple stretch routine.
+
+\begin{lstlisting}[emph={lambda,float,array,int,size,new,while,return},emphstyle={\textbf},caption={Stretching a loop in \emph{Scandal}.},label={alg:stretch}]
+lambda stretch = float tail -> float bars -> lambda b2s -> array start -> {
+	int samples = b2s(bars)
+	samples = samples + size(start)
+	array buffer = new(samples)
+	int offset = b2s(tail)
+	int i = 0
+	int j = size(start)
+	while i < j {
+		buffer[i] = start[i]
+		i = i + 1
+	}
+	while i < samples {
+		buffer[i] = buffer[j - offset]
+		i = i + 1
+		j = j + 1
+	}
+	return buffer
+}
+\end{lstlisting}
+
+\begin{enumerate}
+	\item Line 1 declares a \il{stretch} lambda with the following parameters: a \il{tail} parameter that indicates the portion in bar numbers of the loop, from right to left, that should be stretched. A loop may contain multiple bars, in which case only the last few may stretched, say. A \il{bars} parameter, used to indicate how long in bars the loop should be stretched. A lambda parameter that converts from bars to samples given a particular sampling rate and BPM. Finally, the array to be looped.
+	\item The local variable \il{samples} is used to apply \il{bars} to \il{b2s}, so its parameterized type can be inferred. In line 3, the total number of samples to be returned is computed, and an array of that size is initialized in line 4.
+	\addtocounter{enumi}{2}
+	\item Line 5 applies \il{tail} to \il{b2s} so that stretching the loop may be restricted to that many samples, from right to left. Lines 6 and 7 declare iterators for the subsequent while-loops.
+	\addtocounter{enumi}{2}
+	\item The while-loop in lines 8 to 11 simply copies the contents of the given loop to the beginning of the array that is going to be returned. The while-loop in lines 12 to 16 copies the tail of the loop to the return array for however many \il{bars} were given. Finally, line 17 returns the array containing the stretched loop.
+\end{enumerate}
+
+Having built a mechanism to stretch loops, the next step is to have a way of reading from audio files and positioning these loops in time. Being that the routine that stretches loops is a lambda expression, it would be interesting to make it composable with itself, and with other lambdas that take an array and return another, such as the lambda that reads from files and positions that buffer in time which is about to be constructed. It is no coincidence that the \emph{last} parameter of \il{stretch} is the array. It was constructed that way so that the array parameter could be left as the last to be fixed, hence composable to other array-to-array lambdas. In Listing \ref{alg:append}, the main idea is to create a lambda that holds a path to an audio file and is capable of splicing that audio file to the right of a given buffer.
+
+\begin{lstlisting}[emph={lambda,string,array,read,int,size,new,while,return},emphstyle={\textbf},caption={Appending the contents of a file to a given buffer.},label={alg:append}]
+lambda appendFile = string path -> array start -> {
+	array loop = read(path, 1)
+	int samples = size(start) + size(loop)
+	array buffer = new(samples)
+	int i = 0
+	while i < size(start) {
+		buffer[i] = start[i]
+		i = i + 1
+	}
+	while i < samples {
+		buffer[i] = loop[i - size(start)]
+		i = i + 1
+	}
+	return buffer
+}
+\end{lstlisting}
+
+The algorithm in Listing \ref{alg:append} is easy to follow: given a \il{start} buffer, the routine reads from a file and appends the file's contents to the given buffer. What is not necessarily obvious at first is that \il{appendFile} and \il{stretch} are highly modularized, reusable, and composable methods to deal with loops. Positioning a loop to start playing at, say, the eighth bar is easily accomplished by giving it an empty array of \il{b2s(8.0)} samples. At the moment, there is a mechanism to begin playback of a loop at a certain position in time, and to stretch it arbitrarily, but a way of intercalating silence between occurrences of a loop is still missing. A composable solution is to do basically the same \il{appendFile} does, but giving it, instead of a path to an audio file, an integer number of samples, all of whose values would be zero, to append to a start buffer. The corresponding parameter to this start buffer would naturally be left as the last, in order to make this function composable with \il{appendFile} and \il{stretch}. The code for such \il{appendSilence} routine would be very similar to \il{appendFile}, hence omitted. With the tools at hand, a loop can be positioned in multiple places within an audio track, and each occurrence of the loop could be stretched. Naturally, a method to combine audio tracks is still missing.
+
+Mixing two audio signals is mathematically equivalent to adding two vectors. An obvious way to implement a \il{mix} routine would be to have two nested while-loops. The outer loop iterates over a total-duration number of samples, and the inner loop iterates over all audio tracks, adding their samples point-wise. In the spirit of writing code that is both more concise and reusable, it would be more interesting to write a lambda that took two arrays and mixed them together. Naturally, fixing the first array and leaving the second free makes this lambda composable with the other lambdas declared above. The implementation of such \il{mix} lambda is also straightforward and thus omitted. The very last bit of structure needed to compose a musical piece with loops is to implement the \il{b2s} routine needed by \il{stretch}. A simple implementation is given in Listing \ref{alg:b2s}. The parameters are \il{bpm}, which is specific to the set of loops being considered, number of \il{beats} per bar, that is contextual, and a number of \il{bars}, which is the last parameter because its context is given by the each occurrence of a loop, and not by a characteristic of all loops in a set. The formula reads samples per second (44100) times bars, times beats per bar, times seconds per minute (60), over beats per minute, and returns a value in samples per second.
+
+\begin{lstlisting}[emph={lambda,string,array,read,int,size,new,while,return},emphstyle={\textbf},caption={Converting bars to samples.},label={alg:b2s}]
+lambda barsToSamples = float bpm -> float beats -> float bars -> {
+	int val = 44100.0 * bars * beats * 60.0 / bpm
+	return val
+}
+\end{lstlisting}
+
+Having defined a \il{b2s} function, writing a piece of music with loops is merely a task of applying arguments to the aforementioned lambdas. Listing \ref{alg:scandalous} gives a broad overview of \emph{Scandalous}, a musical composition with loops whose complete code listing is bundled with \emph{Scandal}'s IDE.
+
+\begin{lstlisting}[emph={lambda,new,array,play},emphstyle={\textbf},caption={The high-level structure of a composition with loops.},label={alg:scandalous}]
+lambda barsToSamples = b2s(130.0, 4.0)
+lambda stretch8 = stretch(8.0, 8.0, barsToSamples)
+lambda mute4 = appendSilence(barsToSamples(4.0))
+
+lambda bass8 = appendFile("wav/bass8.wav")
+lambda kick8 = appendFile("wav/kick8.wav")
+lambda snare8 = appendFile("wav/snare8.wav")
+lambda pad8 = appendFile("wav/pad8.wav")
+lambda bass = mix(mute64.bass8.stretch72.mute76(new(0)))
+lambda kick = mix(mute80.kick8.stretch40.mute92(new(0)))
+lambda snare = mix(mute64.snare8.stretch56.mute92(new(0)))
+lambda pad = mix(pad8.stretch56.pulse8.stretch56.pad8.stretch80.mute4(new(0)))
+
+array master = bass.kick.snare.pad.normalize(new(barsToSamples(220.0)))
+play(master, 1)
+\end{lstlisting}
+
+\begin{enumerate}
+	\item The \il{barsToSamples} lambda is a version of \il{b2s} that is specific to the loops chosen for the piece, which all are in 130 beats per minute, with four beats per bar. In line 2, \il{stretch8} is a version of \il{stretch} that takes the last eight bars of a buffer and stretches them for eight more bars, hence loops those bars altogether once. Similarly, \il{mute4} appends four bars, with the given tempo and metric, to a given buffer.
+	\addtocounter{enumi}{3}
+	\item Lines 5 to 8 declare four lambdas that attach a loop to the end of a given buffer. The length of all four loops is eight bars, but the actual piece has many other loops with different lengths.
+	\addtocounter{enumi}{4}
+	\item The lambdas in lines 10 to 13 are the audio tracks corresponding to those instruments. The \il{bass} track, for example, consists of 64 bars of silence, followed by 8 bars of the \il{bass8} loop, stretched to 72 more bars, hence 80 in total, followed by 76 bars of silence. An empty array containing zero samples is applied to this composition of lambdas, and the result is subsequently applied to \il{mix}. The result is a lambda that sums this entire audio track to a given array. Note that all tracks have the same length of 220 bars, so they can be added point-wise.
+	\addtocounter{enumi}{4}
+	\item Line 15 declares a \il{master} array that consists of all instruments composed (added) to a new array of length 220 bars, which is long enough to accommodate each of them. The very last lambda in the composition of line 15 is \il{normalize}, since adding several vectors together may cause the sum at some samples to be greater than one. The \il{normalize} lambda is composable with the rest because it too is an array-to-array lambda. Finally, a \il{play} statement in line 16 causes the entire piece to be plotted and played back.
+\end{enumerate}
+
+\section{Future Work}
+
+One of the biggest challenges encountered so far in \emph{Scandal}'s existence is maintaining a balance between what the language can and cannot do. This balance has deep implications in what the language ultimately is. Given the facility with which \emph{Java} functionality can be ported into \emph{Scandal}, it is not really an issue of \emph{how} the DSL can be extended, but ultimately an issue of \emph{why} should \emph{Scandal} lose its naivety. The main argument supporting the idea of keeping it simple consists of avoiding that gray area in which a DSL is neither easy to learn anymore, nor as versatile as a general-purpose language. An example would be \emph{Supercollider}, a language that is object-oriented, functional, dynamically typed \emph{and} dynamically interpreted, and built over an incredibly fast and reliable \emph{C++} foundation, that can handle any sort of real-time audio signal processing. However, a language that is difficult to learn, has a frozen-in-time, \emph{Smalltalk}-like syntax and that, ultimately, brings no real advantage over a general-purpose language. Quite the contrary, it lacks too many features to justify its steep learning curve. Learning \emph{Swift} is probably easier, but also liberating in the sense that one can write musical applications for mobile devices, write a http server to compose music collaboratively, and use all sorts of third-party API's, to cite but a few. One can make music and process sounds very easily in \emph{Swift} with a library such as \emph{SoundKit}, which can even perform live coding via \emph{Swift Playgrounds}.
+
+The philosophy that drives the development of \emph{Scandal} is that of keeping it easy to learn, above all things. A good educational tool is better than a super-complete DSL that ends up being difficult to learn. The successful \emph{Scandal} user is that who eventually transcends the language and ventures into learning as many other languages as possible. Learning is the motivation, and \emph{Scandal} is but a doorway. And a flawed one, which is a fact that should be constantly emphasized. Other areas than music face a similar paradigm. Domain-specific languages such as \emph{Matlab} and \emph{R} are good examples of how engineers and statisticians can become oblivious to even knowing how to implement algorithms that are the bread and butter of those professions.
+
+In the spirit of promoting learning, future development of \emph{Scandal} shall emphasize more IDE integration, with better error reporting and code highlighting. Also of vital importance is better visualization tools. In what regards the language alone, a lot of effort has been put into making it as declarative as possible, with built-in statements reduced to a minimum. In many cases, however, statements are what allow \emph{Scandal} to remain restricted to its domain, providing hooks to \emph{Java} routines that, if ported to the DSL, would challenge its very purpose. In this sense, much of what it means to improve the language's domain, like its ability to produce user-interface elements, for example, will depend on how new types of statements are introduced. As a language designer, one cannot help but wonder about the trade-offs of such endeavor. A good balance between introducing new features while maintaining scalability is always delicate. On one hand, new features are necessary to provide more functionality. On the other, every bit of functionality that \emph{can} be achieved in terms of the language alone, even if more difficult to implement, must be given priority. If the language only grows in terms of its \emph{Java} underlying implementation, the structure of the compiler and its production rules become increasingly harder to maintain. This philosophy has been the main driving force behind giving \emph{Scandal} a functional flavor. It is also diametrically opposite to the concept of unit generators, although one can still hide implementation in \emph{Scandal}, but the converse is true in general for strict unit-generator languages.
+
+As the language grows in terms of itself, likely there will be need in the future for compiler statements that aid in API documentation, such as double-star comments that are used to generate a web page, say. When it comes to import statements, future versions of \il{Scandal} will check for backward edges in the DAG, and throw a more informative compilation error instead of a runtime error. Also, at the moment each import statement accepts a single expression of type \il{string}, but extending this implementation to allow comma-separated expressions would be fairly trivial. In designing a language, one must consider whether such implementation would \emph{actually} improve the language. \emph{Java} only supports single import statements and that can cause some clutter in the document header. Good IDE's will collapse import statements, which mitigate the cluttering somehow. With \emph{Go}, on the other hand, one is allowed to have multiple import statements, declared as space-separated strings. More often than not, though, these strings are quite long, and eventually are broken into multiple lines. In \emph{Scandal}, import statements take paths to files in the file system, which may be fairly long strings. The current \emph{Scandal} syntax is very similar to \emph{Go}, however only single import statements are allowed, like \emph{Java}, and the ability to collapse import statements in the IDE will likely take precedence over multiple import statements in the future.
+
+Switches, repeat-while-loops, and for-loops are not yet included, but certainly intended. A more complete implementation of the two currently supported types of control statement would also include handling the cases where, instead of a block, a single statement is allowed to be executed, should the condition succeed. Adding this functionality is trivial, and would improve readability since the surrounding brackets could be dropped. A similar type of syntactic sugar has been implemented for lambda literal expressions. A \il{LambdaLitExpression} takes an array of parameters and returns an expression, whereas its subclass \il{LambdaLitBlock} contains, in addition, a \il{ReturnBlock}. When the body of a lambda literal consists of a return expression alone, the surrounding brackets may be dropped, allowing the entire lambda to be expressed in a single line.
+
+Plot statements are absolutely fundamental to any digital signal processing development environment. Currently, \il{Scandal} supports static linear plots but, as the language evolves, there will be need for many other types of plots. These include logarithmic plots, plots of the complex plane, three-dimensional plots, spectrograms, as well as dynamic plots such as oscilloscopes. Play statements do not overload the \il{format} property to accept floats, although it may be useful in the future to use floats in order to define a surround configuration, such as 5.1, or 8.4 speakers, where the decimal part corresponds to the number of sub-woofers in a speaker configuration. The same applies to the channel count in write statements.
+
+Overloading operators can be very beneficial for a DSL. \emph{MATLAB} is perhaps one of the best examples, but also \emph{Csound} operates almost exclusively on overloaded array operations. Expressions that resemble the way they are written mathematically are also fundamental in improving readability, as well as removing the clutter created by words for which a household symbolic representation exists. The future steps of \emph{Scandal} shall improve even further the functionality of binary expressions. Given the nature of the language's domain, overloaded array operations are the next logical step. As a simple example, one could apply a scalar to an entire array in the same way one would write such an expression mathematically. Let $\alpha = 2$ and $\vec{v} = [1 \; 2 \; 3]$. Then $\alpha \cdot \vec{v} = [2 \; 4 \; 6]$. With overloaded array operations, one could write \il{a * [1, 2, 3]} and have it evaluated to \il{[2, 4, 6]}. At the moment, one cannot construct arrays of any type other than arrays of floats. Rather than a design choice, this is another incomplete implementation that shall be revised in the future. Cosine is also the only transcendental function built into \emph{Scandal}, since other trigonometric functions can be computed in terms of the cosine. This is, again, not a design choice but a yet incomplete aspect of the language. The syntax for power expression will likely change in the future to that of a caret operator inside a binary expression, which will require one more level of precedence among operators than factors.
+
+Restricting fields to be declared only at the outermost scope is aimed at forcing clarity among declarations. Again here, it would be trivial to allow them to be declared anywhere, but it is arguably confusing to declare a global variable inside an inner scope, so such declarations will likely remain forbidden. The restriction for lambda literals, however, is not deliberate, but rather the result of an incomplete implementation. A fair amount of bookkeeping goes into allowing lambda literal declarations into an inner scope. For one, these would need to be local variables, and currently all lambda literals are global. Moreover, local lambdas can always be achieved by copying a field, hence no additional functionality would be achieved, thus their implementation is omitted in this proof of concept. Protecting against bad access remains problematic with the given symbol table configuration. One solution would be to instantiate a \il{SymbolTable} per each lambda literal, copy all field declarations into it, and not bother with introducing new scopes at all. This feature remains unimplemented, but is planned. The difference at the moment is that a bad access will cause a runtime error, whereas a properly implemented separate symbol table would fail at finding a the non-field declaration, throwing a much more useful compilation error instead. For the time being, lambda expressions with blocks in \emph{Scandal} are neither allowed to declare lambda literals inside their blocks, nor return expressions of type \il{lambda}. This remains one of the most critical shortcomings of the language, and should change in the near future. Lambdas can still be returned from lambdas by partial application, but being able to dynamically generate new functions will represent a major step in making \emph{Scandal} even more of a functional language. Implementing this feature will require that not all lambda literal expressions be fields in the \emph{Java} class, and will thus have a huge impact on how the language manages capturing the environment inside a method body.
+
+The implementation of lambda compositions is at the moment very incomplete, and represents no more than a proof of concept. The main reason for incompleteness is the fact that the \il{LambdaCompExpression} class holds an array of identifier expressions, whereas it should hold an array of general expressions that could possibly partial lambda applications. It is impossible at the moment to, say, fix parameters in a composed lambda, except for the very last expression, which is in fact allowed to be a lambda application. This missing functionality does not impair the language, as not being able to return lambdas from lambdas does, it only makes \emph{Scandal} code more verbose than it needs to be. Moreover, holding an array of identifiers alone poses a huge complication when it comes to type-checking. As exemplified by the quite complicated type-checking mechanism of lambda applications, type-checking lambda compositions that are given by name references alone would mean the same effort of a lambda application for \emph{each} of the composed lambdas. What is worse, is that all this work would be a waste, since such implementation would still not provide the language the functionality of fixing partial applications in composed lambdas. For all these reasons, type-checking in lambda compositions is mostly ignored, until the time when such expressions evolve to encompass partial applications of lambdas. It is easy to see that the ability to return lambdas from literal lambdas would play a crucial role here, since a chain of composed lambdas would then possibly contain \emph{total} applications that would return functions, and those could be further composed to return anything, including other functions. Completing the implementation of lambda composition expressions would also require checking that the argument list given to the last lambda agrees with the expected parameters of the \emph{first} lambda, given that \emph{Scandal} does not compose lambdas in the mathematical sense. Furthermore, a type-checking rule shall be imposed such that the parameterized return type of the first expression equals the input type of the second, and so on until the type of the composition expression is taken to be the return type of the very last expression.
