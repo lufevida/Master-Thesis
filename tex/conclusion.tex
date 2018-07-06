@@ -108,7 +108,7 @@ Listing \ref{alg:oscillator} creates a buffer of audio samples containing a wave
 
 \begin{lstlisting}[emph={lambda,float,cos,pi,if,return},emphstyle={\textbf},caption={Waveform-generating lambdas.},label={alg:waveforms}]
 lambda cosine = float phase -> cos(phase)
-lambda sawtooth = float phase -> 2 * (1 - phase / (2 * pi)) - 1
+lambda sawtooth = float phase -> 1 - phase / pi
 
 lambda square = float phase -> {
 	float val = 1.0
@@ -117,7 +117,7 @@ lambda square = float phase -> {
 }
 
 lambda triangle = float phase -> {
-	float val = 1 - phase / pi
+	float val = sawtooth(phase)
 	if val < 0.0 { val = -val }
 	return 2 * val - 1
 }
