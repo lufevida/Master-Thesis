@@ -69,12 +69,13 @@ Decoration of import statements begins by checking that the current scope number
 		\end{itemize}
 \end{itemize}
 
-Decorating assignment statements involves looking for a declaration value whose key corresponds to the identifier held in \il{firstToken.text}, starting from the innermost (topmost) scope, and descending to the bottom of the stack of symbol tables, as needed. Contrary to assignment declarations, if \emph{no} declaration is found, an error is thrown. Decoration of the \il{expression} property is delegated to the corresponding subclass of \il{Expression}, as usual. The exact same caveat with type inference in instances of \il{LambdaAppExpression} applies here, so a check is made to determine whether the given expression is a lambda application of a lambda parameter inside a return block. If so, the \il{AssignmentStatement} class decorates the lambda application expression with its declaration's type. All that is left is to check if the type of the declaration corresponds to the type of the expression, and an error is thrown if there is a mismatch.
+Decorating assignment statements involves looking for a declaration value whose key corresponds to the identifier held in \il{firstToken.text}, starting from the innermost (topmost) scope, and descending to the bottom of the stack of symbol tables, as needed. Contrary to assignment declarations, if \emph{no} declaration is found, an error is thrown. Another check is made to determine if the declaration corresponds to a lambda literal expression, throwing an error if so. The latter are final fields in the \emph{Java} class, hence cannot be reassigned. Decoration of the \il{expression} property is delegated to the corresponding subclass of \il{Expression}, as usual. The exact same caveat with type inference in instances of \il{LambdaAppExpression} applies here, so a check is made to determine whether the given expression is a lambda application of a lambda parameter inside a return block. If so, the \il{AssignmentStatement} class decorates the lambda application expression with its declaration's type. All that is left is to check if the type of the declaration corresponds to the type of the expression, and an error is thrown if there is a mismatch.
 
 \begin{itemize}
 	\item AssignmentStatement:
 		\begin{itemize}
 			\item Must have been declared in some enclosing scope
+			\item Cannot reassign lambda literals
 			\item Declaration.Type = Expression.type
 		\end{itemize}
 \end{itemize}

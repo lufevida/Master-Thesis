@@ -1,63 +1,5 @@
 \chapter{PREVIOUS WORK}
 
-% Formal languages lend precision and flexibility to music specification because they require that musical ideas be turned into abstract symbols and stipulated explicitly.
-
-% Herein lies both the advantage and disadvantage of linguistic interaction with a computer music system.
-
-% The advantage is that formalized and explicit instructions can yield a high degree of control.
-
-% To create an imagined effect, composers need only specify it precisely.
-
-% They can easily stipulate music that would be difficult or impossible to perform by human beings.
-
-% In some cases, a linguistic specification is much more efficient than gestural input would be.
-
-% This is the case when a single command applies to a massive group of events, or when a short list of commands replaces dozens of pointing and selecting gestures.
-
-% The shell scripts of Unix operating systems are a typical example of command lists (Thompson and Ritchie 1974).
-
-% These advantages turn into a disadvantage when simple things must be coded in the same detail and with the same syntactic overhead as complicated things.
-
-% For example, with an alphanumeric language, envelope shapes that could be drawn on a screen in two seconds must be plotted out on paper by hand and transcribed into a list of numerical data to be typed by the composer.
-
-% For many tasks, graphical editors and visual programming systems, in which the user selects and interconnects graphical objects, are more effective and easier to use than their textual counterparts (see chapter 16).
-
-% Some languages are interactive; one can type individual statements and each of them is interpreted in turn.
-
-% This can occur in a concert situation, but the slow information rate of typing — not to mention the mundane stage presence of a typist — precludes this approach in fast­paced real­time music­making.
-
-% Gestural control through a musical input device is more efficient and natural.
-
-% Hence, languages for music, although important, do not answer all musical needs.
-
-% In the ideal, music languages should be available alongside other kinds of musical interaction tools.
-
-% \cite[785-786]{Roads1995}.
-
-% Textual languages are a precise and flexible means of controlling a computer music system.
-
-% In synthesis, score entry, and composition, they can liberate the potential of a music system from the closed world of canned software and preset hardware.
-
-% In the mid­-1980's it looked as if the Music N synthesis language dynasty might languish, due to the spread of inexpensive synthesizers.
-
-% In MIDI systems, however, the use of a score language is less common, since most music can be entered by other means (such as a music keyboard, notation program, or scanner).
-
-% For musicological applications that involve score analysis, however, a text­-based score representation may be optimum.
-
-% New textual languages for procedural composition continue to be developed, but there is a strong parallel trend toward interactive programs with graphical interfaces.
-
-% Instead of typing text, one patches together icons, draws envelopes, and fills in templates.
-
-% The textual language representation supporting the graphics is hidden from the user.
-
-% Early programming languages for music tended to favor machine efficiency over ease of use.
-
-% The present trend in programming has shifted from squeezing the last drop of efficiency out of a system to helping the user manage the complexity of layer upon layer of software and hardware.
-
-% The most common solution to this problem is object­-oriented programming (see chapter 2), and compositional applications are no exception to this trend (Pope 1991b).
-
-% \cite[817]{Roads1995}.
-
 Arguably the first notable attempt to design a programming language with an explicit intent of processing sounds and making music was that of \emph{Music I}, created in 1957 by Max Mathews. The language was indented to run on an IBM 704 computer, located at the IBM headquarters in New York City. The programs created there were recorded on digital magnetic tape, then converted to analog at Bell Labs, where Mathews spent most of his career as an electrical engineer. \emph{Music I} was capable of generating a single waveform, namely a triangle, as well as assigning duration, pitch, amplitude, and the same value for decay and release time. \emph{Music II} followed a year later, taking advantage of the much more efficient IBM 7094 to produce up to four independent voices, chosen from 16 waveforms. With \emph{Music III}, Mathews introduced in 1960 the \emph{unit generator} concept, which consisted of small building blocks of software that allowed composers to make use of the language with a lot less effort and required background. In 1963, \emph{Music IV} introduced the use of macros, which had just been invented, although the programming was still done in assembly language, hence all implementations of the language remained machine-dependent. With the increasing popularity of \emph{Fortran}, Mathews designed \emph{Music V} with the intent of making it machine-independent, at least in part, since the unit generators' inner loops were still programmed in machine language. The reason for that is the burden these loops imposed on the computer \cite[15-17]{Roads1980}.
 
 \section{Software Synthesis Languages}
@@ -184,7 +126,6 @@ Between the 1960's and the 1990's, many programming languages were devised to ai
 \end{lstlisting}
 
 \begin{figure}[h]
-	\caption{Typesetting music with \emph{MusiXTex}.}
 	\label{doremi}
 	\centering
 	\begin{music}
@@ -196,6 +137,7 @@ Between the 1960's and the 1990's, many programming languages were devised to ai
 		\Notes \hu{e d} \en
 		\endextract
 	\end{music}
+	\caption{Typesetting music with \emph{MusiXTex}.}
 \end{figure}
 
 In 2018, a few score input languages remain, despite the vast predominance of graphical user interfaces as a means to input notes to a score. \emph{MusiXTex} is a surviving example that compiles to \LaTeX, which in turn compiles to PDF documents. It was created in 1991 by Daniel Taupin. The language has such unwieldy syntax, that often a preprocessor is required for more complex scores. One famous such processor is \emph{PMX}, a \emph{Fortran} tool written by Don Simons in the late 1990's. Another was \emph{MPP}, which stands for MusiXTex Preprocessor, created by Han-Wen Nienhuys and Jan Nieuwenhuizen in 1996, and which eventually became \emph{LilyPond}, arguably the most complete surviving score input language today. \emph{LilyPond} has a much simpler syntax than that of \emph{MusiXTex}, however not nearly as simple as \emph{ABC} music notation, a language that much resembles \emph{Musica} and which is traditionally used in music education contexts. A package written by Guido Gonzato that can produce simple scores in \emph{ABC} notation is available in \LaTeX. Its simplicity comes, however, at the expense of incompleteness. Finally, it is worthwhile to mention a music-notation specific standard that has emerged in the mid-2000's, namely the \emph{MusicXML} standard. Heavily influenced by the industry, it was initially meant as an object model to translate scores between commercial applications where the score input method was primarily graphical, and whose underlying implementation was naturally object-oriented. \emph{MusicXML} is extremely verbose, and borderline human-readable. It is, however, very complete, to the point of dictating what features an object-oriented implementation should comprise in order to be aligned with the industry standards. In recent years, many rumors have surfaced to make \emph{MusicXML} an Internet standard, such as that of \emph{Scalable Vector Graphics}, however nothing concrete has been established. Listing \ref{alg:latex} shows a \emph{MusiXTex} example of the very same musical material given in Listing \ref{alg:padua}. One can immediately notice the difference in implementation by the sheer amount of code required to express basically the same symbols.
@@ -264,8 +206,10 @@ Besides domain-specific languages, a variety of libraries exist for general-purp
 
 \section{The Test of Time}
 
+Representing musical ideas as structured text requires that these ideas be converted into abstract symbols. This representation is nonetheless flexible and precise. Its formality and explicit specification provides a high degree of control, but takes a toll on the composer and producer, who is responsible for making such explicit specifications. Furthermore, many ideas that are cumbersome, or even impossible for humans to perform, are easily defined and executed by a computer. Whereas structured text is often preferred over gestural input, its inherent explicit specification may become too burdening in some cases. In other cases, it may even be counter-intuitive. Graphical user interfaces are usually easier to learn and use, and better suited than programming languages in many applications, such as real-time control of live performances. Languages that can be dynamically interpreted are capable of handling a variety of live-coding applications, but still cannot replace gestural control in how natural and efficient it is. Although flexible and precise, music languages still depend on other technologies, and are ideally placed among a tool set \cite[785-786]{Roads1995}. As an example, score input languages often perform poorer than other forms of input, such as GUI applications, MIDI keyboards, and optical scanners. Score \emph{analysis}, on the other hand, becomes greatly enhanced by a structured text representation. Usually, though, implementation is hidden in commercial application, hence a score input tool that could make its underlying representation explicit, could potentially a good analysis tool, as well. As a general trend, the early days of music programming languages favored efficiency over ease-of-use. An observable trend in the mid-Nineties was to shift focus from pure performance toward representations that were easier to manage by programmers, such as object-oriented programming, and music languages were very much a part of that trend \cite[817]{Roads1995}.
+
 Currently, out of the multitude of tools and ideas devised between the Sixties and the early Nineties, the languages that really withstood the test of time were \emph{Csound} and \emph{Max}. Both eventually real-time \emph{synthesis} languages, but \emph{Max} became also a commercial application, whereas \emph{Csound} remains a community-maintained open source project. \emph{Max} was sold by the extinct Opcode Systems in the mid-Nineties, then was maintained and sold by Cycling '74 from the late nineties until the latter was sold to Ableton in the mid-2010's. \emph{Max} really blossomed in the 2000's, eventually becoming a digital arts platform, with vast support for image and video processing. The unit generator concept still applies: defining signal processing algorithms by dragging boxes around is easier, but more limited than creating the boxes themselves in \emph{C}. Over the years, \emph{Max} provided hooks to routines defined in other general-purpose programming languages, namely boxes that can execute \emph{Csound}, \emph{Java}, and more recently \emph{JavaScript} code, as well as \emph{Max}'s very own scripting language that is used inside \emph{GEN} boxes. This ability mitigates somehow some of the shortcomings of a very high-level language. Control statements in \emph{Max} are cumbersome and, although the concept of encapsulation exists in \emph{Max}, code re-usability is very much neglected. Still, \emph{Max} is easy enough to learn, very efficient and has surely survived to become an essential tool in most digital artists' arsenals.
 
 \emph{Csound}, on the other hand, has experienced a steady-state phase since the late Nineties, with very little progress really made. Likely due to it being community-maintained, the language never really evolved much from its \emph{Music N} origins, and remains very limited. Open-source projects are notoriously difficult to change, as backward-compatibility is usually preferred over innovation. One can still compile and run \emph{Trapped in Convert} by Richard Boulanger, a piece written in \emph{Music 11} in 1979, then ported to \emph{Csound} in 1996, with the latest version of \emph{Csound}. At the same time, libraries are practically inexistent for the language, which has exhibited a tendency over the years to simply incorporate more and more unit generators to its compiler. This practice accounts for very poor documentation of the language in general, given how centralized its development is. It also accounts for a myriad of incoherent and outdated opcodes. User-defined opcodes, an alternative to extending the language in terms of itself, rather than in terms of its native \emph{C}, is unattractive and never really took. One of the biggest problems with \emph{Csound} remains that of algorithmically generating musical events. Although supported by the language to some extent, control statements have a very cumbersome syntax. Since the mid-2000's, the ability to execute \emph{Python} code from withing \emph{Csound} has improved somehow its ability to become a viable tool for algorithmic composition. One of the ways in which \emph{Csound} has grown over the years, however, is as an embeddable \emph{C}-library that is very fast and complete. Many of the shortcomings of its DSL suddenly become qualities when \emph{Csound} is embedded to a GUI application written in another language, such as its gigantic amount of opcodes.
 
-Since the mid-Nineties, a third language has survived the test of time, namely \emph{Supercollider}. It is orders of magnitude more complete and versatile than \emph{Csound} and \emph{Max} combined, except for the latter's ability to render video, which \emph{Supercollider} lacks. It consists of three components: an interpreter, a DSL, and an IDE. The interpreter, which is also called synthesizer, may be used on its own and, like \emph{Csound}, is embeddable. All three components are multi-platform, open-source, and written in \emph{C++}. The DSL is both object-oriented and functional, and is very similar to \emph{Smalltalk}. In fact, \emph{Supercollider} has a huge library of classes that describe all sorts of signal processing algorithms, all of which written in terms of the language itself. The syntax of the DSL is its weakest point, and features symbols and conventions that are not easily readable by most computer programmers. Given that \emph{Supercollider} is too a unit-generator language, working with it consists mainly of combining ugens in interesting ways. As there are hundreds of ugens, mostly organized hierarchically as subclasses of one another, with many inheritance details, \emph{Supercollider} has a very steep learning curve, certainly the steepest of all music DSL's. That, combined with its \emph{Smalltalk}-like syntax, makes learning the language a very poor alternative to learning a general-purpose language. In fact, with adequate background, it may be easier to write a real-time audio implementation in a general-purpose language than to altogether learn \emph{Supercollider}. That said, since its creation in 1996 by James McCartney, the language has certainly endured and conquered its place in the Swiss-army knives of electro-acoustic music composers. Its IDE is the best-in-class, with access to documentation, code highlighting and completion, and is capable of executing code dynamically, line-by-line. This makes the DSL especially suited for live-coding applications and laptop ensembles.
+Since the mid-Nineties, a third language has survived the test of time, namely \emph{Supercollider}. It is orders of magnitude more complete and versatile than \emph{Csound} and \emph{Max} combined, except for the latter's ability to render video, which \emph{Supercollider} lacks. It consists of three components: an interpreter, a DSL, and an IDE. The interpreter, which is also called synthesizer, may be used on its own and, like \emph{Csound}, is embeddable. All three components are multi-platform, open-source, and written in \emph{C}++. The DSL is both object-oriented and functional, and is very similar to \emph{Smalltalk}. In fact, \emph{Supercollider} has a huge library of classes that describe all sorts of signal processing algorithms, all of which written in terms of the language itself. The syntax of the DSL is its weakest point, and features symbols and conventions that are not easily readable by most computer programmers. Given that \emph{Supercollider} is too a unit-generator language, working with it consists mainly of combining ugens in interesting ways. As there are hundreds of ugens, mostly organized hierarchically as subclasses of one another, with many inheritance details, \emph{Supercollider} has a very steep learning curve, certainly the steepest of all music DSL's. That, combined with its \emph{Smalltalk}-like syntax, makes learning the language a very poor alternative to learning a general-purpose language. In fact, with adequate background, it may be easier to write a real-time audio implementation in a general-purpose language than to altogether learn \emph{Supercollider}. That said, since its creation in 1996 by James McCartney, the language has certainly endured and conquered its place in the Swiss-army knives of electro-acoustic music composers. Its IDE is the best-in-class, with access to documentation, code highlighting and completion, and is capable of executing code dynamically, line-by-line. This makes the DSL especially suited for live-coding applications and laptop ensembles.
