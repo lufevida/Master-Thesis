@@ -24,7 +24,7 @@
 
 \begin{document}
 
-\bibliographystyle{bst/IEEEtran}
+\bibliographystyle{bst/ecology_web}
 
 \maketitle
 \makecopyright
@@ -38,11 +38,7 @@
 }
 
 \acknowledge{
-	This work would not have been possible without the help and expertise of Dr.~Beverly Sanders, who also wrote the majority of \emph{Scandal}'s compiler, and was the first to believe in the project.
-
-	A debt of gratitude is owed to Dr.~James Sain for his constant support, understanding, knowledge, and wisdom.
-
-	\emph{Scandal} utilizes the ASM library for compiling its domain-specific language; the \emph{JUnit} library for unit testing; and the \emph{RichTextFX} library for its code editor.
+	\emph{Scandal} is indebted to the help and expertise of Dr.~Beverly Sanders, who was the first to believe in the project, and from whose teachings came all inspiration to design a new programming language. The \emph{Scandal} compiler was partly based on her work. A debt of gratitude is owed to Dr.~James Paul Sain for his constant support, understanding, knowledge, and wisdom. And another is owed to Dr.~Kyla McMullen for her excitement and encouragement. \emph{Scandal} utilizes the ASM library for compiling its domain-specific language, the \emph{JUnit} library for unit testing, and the \emph{RichTextFX} library for its code editor. The love, support, and generosity of Susana Villas-Boas Vieira, G\^eni Torri Dischinger, Vicente Vieira Damiani, and Giannina Migliore cannot be overstated. This work would not have been possible without sharing a life with Maria In\^es Torri Dischinger, to whom all is dedicated.
 }
 
 \pdfbookmark[0]{TABLE OF CONTENTS}{tableofcontents}
@@ -52,7 +48,7 @@
 
 \phantomsection
 \begin{abstract}
-This research contemplates the design and implementation of a domain-specific language meant for digital audio signal processing and algorithmic music composition. \emph{Scandal} is a scripting language with non-pure functional capabilities. The given language implementation compiles source code into \emph{Java} bytecode, so that a \emph{Scandal} program is ultimately executed by the multi-platform \emph{Java Virtual Machine}. Programming languages have been the user interface of choice for most art musicians given their flexibility compared to graphical user interfaces. Many music DSL's have withstood the test of time and, after several decades, are still being used and actively maintained by ever-growing communities of artists and scientists. Learning programming languages can be burdening to musicians, especially when the implementation-hiding of higher-level languages obfuscates details that are connected with the understanding of basic principles. \emph{Scandal} contributes to the fields of computer science and music by providing a learning tool in the form of a high-level programming language, where implementation details can be exposed to the aspiring scientist and artist, as needed. The result of this research is the proof-of-concept of a programming language that leverages \emph{Java} API's to generate and process real-time audio, is completely integrated into its IDE, and is capable of handling general algorithms, with a particular focus to audio processing and musical applications.
+This research contemplates the design and implementation of a domain-specific language meant for digital audio signal processing and algorithmic music composition. \emph{Scandal} is a scripting language with non-pure functional capabilities. The given language implementation compiles source code into \emph{Java} bytecode, so that a \emph{Scandal} program is ultimately executed by the multi-platform \emph{Java Virtual Machine}. Programming languages have been the user interface of choice for most art musicians given their flexibility compared to graphical user interfaces. Many music DSLs have withstood the test of time and, after several decades, are still being used and actively maintained by ever-growing communities of artists and scientists. However, learning programming languages can be burdening to musicians, especially when the abstraction of higher-level languages obfuscates details that are connected with the understanding of basic principles. \emph{Scandal} contributes to the fields of computer science and music by providing a learning tool in the form of a high-level programming language, where implementation details can be exposed to the aspiring scientist and artist, as needed. The result of this research is the proof-of-concept of a programming language that leverages \emph{Java} APIs to generate and process real-time audio, is completely integrated into its IDE, and is capable of handling general algorithms with a particular focus to audio processing and musical applications.
 \addtocontents{toc}{\protect\addvspace{10pt}\noindent{CHAPTER}\protect\hfill\par}{}
 \end{abstract}
 
@@ -66,14 +62,14 @@ This research contemplates the design and implementation of a domain-specific la
 
 % \appendix
 % \addtocontents{toc}{\protect\addvspace{10pt}\noindent{APPENDIX}\protect\hfill\par}{}
-% \input{tex/appendixA}
+% \input{tex/appendix}
 
 \phantomsection
 \addcontentsline{toc}{chapter}{REFERENCES}
 \bibliography{references}
 
 \biography{
-	Luis F. Vieira Damiani earned in 2002 a Bachelor of Music degree in violin performance from Rio Grande do Sul's Federal University, under the orientation of Prof.~Marcello Guerchfeld, a former student of Galamian. In 2003, Luis entered Porto Alegre Symphony, with which he performed as soloist in the 2005 season. In 2004, he was appointed Assistant Concertmaster of the Catholic University of Rio Grande do Sul's Philharmonic Orchestra, and from 2009 until 2011, Luis was a member of Minas Gerais Philharmonic, one of the top Brazilian groups of its kind. In Italy, he studied with Boris Belkin and Giuliano Carmignola at the Accademia Chigiana. Other teachers include Jennifer John at the Aspen Music Festival in 1996, and Kurt Sassmannshaus at University of Cincinnati's College-Conservatory of Music in 1999. As a performer, Luis researched, engraved and premiered works by 20\textsuperscript{th} Century Southern Brazilian composers Bruno Kiefer and Armando Albuquerque, as well as recorded in 2006 of the \emph{Duo for Violin and Cello} (2000) by composer Pablo Castellar, a recording that won the A\c{c}orianos Prize from the Municipal Office of Culture of Porto Alegre in 2008.
+	Luis F. Vieira Damiani earned in 2002 a Bachelor of Music degree in violin performance from Rio Grande do Sul's Federal University, under the orientation of Prof.~Marcello Guerchfeld, a former student of Galamian. In 2003, Luis entered Porto Alegre Symphony, with which he performed as soloist in the 2005 season. In 2004, he was appointed Assistant Concertmaster of the Catholic University of Rio Grande do Sul's Philharmonic Orchestra, and from 2009 until 2011, Luis was a member of Minas Gerais Philharmonic, one of the top Brazilian groups of its kind. In Italy, he studied with Boris Belkin and Giuliano Carmignola at the Accademia Chigiana. Other teachers include Jennifer John at the Aspen Music Festival in 1996, and Kurt Sassmannshaus at University of Cincinnati's College-Conservatory of Music in 1999. As a performer, Luis researched, engraved and premiered works by 20\textsuperscript{th}-Century Southern Brazilian composers Bruno Kiefer and Armando Albuquerque, as well as recorded in 2006 of the \emph{Duo for Violin and Cello} (2000) by composer Pablo Castellar, a recording that won the A\c{c}orianos Prize from the Municipal Office of Culture of Porto Alegre in 2008.
 
 	As a composer, Luis wrote in 2008 the original music for the motion picture \emph{O Guri}. For television, his commissioned works include the soundtrack for the short film \emph{O Sabi\'a}, aired in 2010. In the same year, he received the prestigious Classical Composition Award from the National Foundation of Arts in Brazil for his \emph{Solo Violin Suite}, making him take a turn from a well-established orchestral career into pursuing graduate studies in the USA. Luis' awards since include Best Feature Soundtrack at the 6\textsuperscript{th} Cinefantasy International Fantastic Film Festival in 2011 and the University of South Florida's 2012 Percussion Composition Prize, among numerous academic awards. In 2013, he received a Master of Music degree in music composition from the University of South Florida, under the orientation of Dr.~Baljinder Sekhon. In the same year, Luis was awarded a fellowship to pursue Ph.D. studies in music composition at the University of Florida, where he is currently a doctoral candidate, under the orientation of Dr.~James Paul Sain.
 }
