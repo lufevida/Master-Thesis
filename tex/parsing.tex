@@ -133,12 +133,7 @@ Print statements provide the functionality of printing to the IDE's console the 
 
 The \il{PlotStatement} class extends \il{Statement} by including two more expressions. The three expression properties are namely a string to display a title for the plot, an array of points to be plotted, and an integer defining the number of points to be plotted. Since arrays of audio samples can be quite long, the last parameter is used to decimate an array if it is longer than the specified number of points. If it is shorter, the \il{PlotTab} class in the IDE will oversample the array to have the specified length. Plot statements are parsed by consuming the keyword and a left parenthesis, then calling \il{expression} on the parser three times, consuming the commas in between. Finally, the right parenthesis is consumed, and an instance of \il{PlotStatement} is returned, whose constructor uses the keyword token and first expression to construct the superclass, storing the other two expressions as properties.
 
-\begin{figure}[b!]
-	\includegraphics[width=4.5in]{img/plot}
-	\caption[Plotting an array in \emph{Scandal}.]{Plotting an array in \emph{Scandal}.}
-\end{figure}
-
-\newpage Play statements take an array of audio samples and an integer number of channels, hence extend \il{Statement} by adding to it a second expression property. Parsing is done exactly the same way it is for plot statements, only there is one less expression to parse. The last type of framework statement in the language deals with saving a \emph{.wav} file to disk. Write statements take three arguments, namely the array containing audio samples, a string containing a path in the file system, and an integer number of channels. Parsing follows the exact same pattern found in other framework statements.
+Play statements take an array of audio samples and an integer number of channels, hence extend \il{Statement} by adding to it a second expression property. Parsing is done exactly the same way it is for plot statements, only there is one less expression to parse. The last type of framework statement in the language deals with saving a \emph{.wav} file to disk. Write statements take three arguments, namely the array containing audio samples, a string containing a path in the file system, and an integer number of channels. Parsing follows the exact same pattern found in other framework statements.
 
 \section{Subclasses of Expression}
 

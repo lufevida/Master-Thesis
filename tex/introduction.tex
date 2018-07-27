@@ -56,6 +56,13 @@ play(lisa, 1)
 	\item Line 7 will print to the console that playback has begun, and line 8 starts a real-time audio thread that plays the captured audio back. Since every \il{play} statement runs on its own thread, none of them block the execution thread, and the statement in line 9 will play back simultaneously with the one in line 8.
 \end{enumerate}
 
+\begin{figure}[p]
+	\includegraphics[width=4.5in]{img/plot}
+	\caption[Plotting an array in \emph{Scandal}.]{Plotting an array in \emph{Scandal}.}
+\end{figure}
+
+\clearpage
+
 Even though the language \emph{can} behave in the imperative fashion exemplified above, a lot of effort has been put into making it as declarative as possible. In fact, expressions in \emph{Scandal} cannot be evaluated at all on their own, rather existing only in the context of a declaration or statement, contrary to many languages that will allow expressions to be evaluated directly on the command line. \emph{Scandal} can work on the command line, but some of its functionality is restricted there. Namely, plots are not shown, and the playback thread blocks, that is, it is impossible to hear two \il{play} statements simultaneously. To mitigate the imperative impulse of a scripting language, \emph{Scandal} proposes the use of lambda expressions, which will be discussed later in this chapter. In effect, one can compose an entire piece of music in \emph{Scandal} practically with lambda expressions alone. These lambdas can be broken down into partial applications of their constituent parts, and those can in turn be composed with other lambdas, providing the language with great flexibility. The next sections present a sampler of \emph{Scandal} implementations of some general-purpose algorithms, with a focus on the language's limitations, which are natural, given the specificity of its domain of applications. Many of the programs discussed here come bundled with \emph{Scandal}'s IDE, under the \emph{Examples} tab of its right accordion view.
 
 \subsection{Array Operations}
